@@ -1,0 +1,70 @@
+---
+title: "Análise Estatística por Modelos Lineares Generalizados"
+author:
+  - "Ananda Rivas"
+  - "Isabelle Sannier"
+lang: pt-BR
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    fontsize: 12pt
+    geometry: margin=2.5cm
+    colorlinks: true
+bibliography: referencias.bib
+---
+
+# 1. Introdução
+
+Apresentação do problema estudado, contextualização
+e importância da análise estatística.
+
+# 2. Objetivos
+
+## 2.1 Objetivo geral
+
+...
+
+## 2.2 Objetivos específicos
+
+...
+
+# 3. Fundamentação teórica
+
+## 3.1 Modelos Lineares Generalizados
+
+...
+
+## 3.2 Distribuições de probabilidade
+
+...
+
+## 3.3 Funções de ligação
+
+...
+
+# 4. Material e métodos
+
+## 4.1 Descrição dos dados
+
+## 4.2 Análise exploratória
+
+## 4.3 Ajuste dos modelos
+
+## 4.4 Critérios de comparação
+
+# 5. Resultados e discussão
+
+## 5.1 Resultados da análise exploratória
+
+## 5.2 Ajuste dos modelos
+
+## 5.3 Diagnóstico dos modelos
+
+## 5.4 Comparação dos modelos
+
+## 5.5 Interpretação dos resultados
+
+# 6. Conclusão
+
+# 7. Referências bibliográficas
