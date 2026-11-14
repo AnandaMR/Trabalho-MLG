@@ -639,9 +639,30 @@ abline(0, 1, lty = 2, col = "red")
 
 Pontos próximos à diagonal indicam concordância descritiva entre probabilidades estimadas e proporções observadas nos grupos. A avaliação deve ser vista com cautela, pois o agrupamento reduz a informação e os resultados são calculados na própria amostra usada para ajustar o modelo.
 
-### Forma funcional das covariáveis quantitativas
+### Sensibilidade a pontos influentes
 
-A regressão logística supõe linearidade no logit para covariáveis numéricas incluídas linearmente. No modelo selecionado, essa suposição é especialmente relevante para `trestbps`, `thalach`, `oldpeak` e `ca`. Recomenda-se examinar gráficos apropriados e comparar, como análise de sensibilidade, a especificação linear com alternativas flexíveis. Como `ca` representa uma contagem discreta pequena, também pode ser avaliada como fator. A seleção automática de variáveis não verifica, por si só, essas suposições.
+Para verificar se as observações destacadas pela Distância de Cook distorcem as estimativas de máxima verossimilhança, reajustamos o modelo reduzido removendo as três observações com maior influência e comparamos os coeficientes estimados:
+
+```{r}
+# Identificação dos 3 índices mais influentes segundo a Distância de Cook
+top_influentes <- order(cook, decreasing = TRUE)[1:3]
+cat("Observações mais influentes (índices):", top_influentes, "\n")
+
+# Reajuste do modelo sem essas observações
+mod_sem_influentes <- update(mod_reduzido, subset = -top_influentes)
+
+# Comparação percentual da variação nos coeficientes
+comparacao_coef <- data.frame(
+  Original = coef(mod_reduzido),
+  Sem_Influentes = coef(mod_sem_influentes),
+  Diferenca_Relativa_Pct = round(
+    (coef(mod_sem_influentes) - coef(mod_reduzido)) / abs(coef(mod_reduzido)) * 100, 2
+  )
+)
+comparacao_coef
+```
+
+A remoção conjunta das três observações com maior Distância de Cook (índices `182`, `197` e `92`) não provoca inversão de sinal em nenhum dos parâmetros estimados. Os principais fatores associados ao desfecho mantêm a mesma direção e ordem de magnitude — por exemplo, `sexMasculino` ($1,430$ vs. $1,455$), `cpAssintomático` ($2,174$ vs. $2,544$), `ca` ($1,237$ vs. $1,504$) e `thalDefeito Reversível` ($1,363$ vs. $1,665$). As variações percentuais mais expressivas concentram-se exclusivamente em categorias que já não apresentavam significância estatística individual (como `cpNão Anginosa` e `slopeDescendente`), o que é esperado em amostras clínicas finitas. Diante da estabilidade qualitativa das estimativas e da ausência de indícios de erro de registro, opta-se por preservar todas as $297$ observações no modelo final.
 
 ## Síntese dos critérios de comparação
 
