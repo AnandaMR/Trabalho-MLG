@@ -262,7 +262,95 @@ O gráfico de proporções revela uma forte heterogeneidade na ocorrência de do
 
 ## Ajuste dos modelos
 
-Especificação do método de estimação  e das estruturas de modelos testadas no software **R**.
+Uma vez concluída a análise exploratória, passamos à etapa de inferência e modelagem estatística. Como nossa variável resposta binarizada (`doenca`) assume valores em $\{0, 1\}$, a abordagem natural fundamenta-se nos **Modelos Lineares Generalizados (MLG)**, ajustamos inicialmente o modelo saturado de covariáveis sob a família Binomial ($\phi = 1$). Antes de interpretar parâmetros individuais, verificamos a significância global do modelo e comparamos diferentes especificações de funções de ligação e conjuntos de preditores.
+
+Para testar a hipótese nula $H_0$ de que nenhuma das covariáveis explica a resposta (modelo nulo com apenas o intercepto), utilizamos a estatística da Razão de Verossimilhanças derivada pela diferença de deviances:
+
+$$G^2 = D_0 - D_1 \sim \chi^2_{df_0 - df_1}$$
+
+onde $D_0$ representa a *null deviance* e $D_1$ a *residual deviance* do modelo ajustado. Em paralelo, ajustamos modelos equivalentes alterando a função de ligação (*logit*, *probit* e *cloglog*) para selecionar a estrutura com menor Critério de Informação de Akaike (AIC):
+
+
+```{r}
+# Ajuste dos modelos completos sob diferentes funções de ligação
+mod_logit   <- glm(doenca ~ age + sex + cp + trestbps + chol 
+                   + fbs + restecg + thalach + exang + oldpeak 
+                   + slope + ca + thal, 
+                   family = binomial(link = "logit"), data = dados)
+
+mod_probit  <- update(mod_logit, family = binomial(link = "probit"))
+mod_cloglog <- update(mod_logit, family = binomial(link = "cloglog"))
+
+# Extração explícita de D0, D1 e cálculo da estatística G^2
+D0  <- mod_logit$null.deviance
+df0 <- mod_logit$df.null
+D1  <- mod_logit$deviance
+df1 <- mod_logit$df.residual
+
+G2_global <- D0 - D1
+df_global <- df0 - df1
+p_global  <- pchisq(G2_global, df = df_global, lower.tail = FALSE)
+
+# Exibição dos resultados para verificação no relatório
+cat("Deviance Nula (D0):", round(D0, 2), "| gl (df0):", df0, "\n")
+cat("Deviance Residual (D1):", round(D1, 2), "| gl (df1):", df1, "\n")
+cat("Estatística G^2 =", round(G2_global, 2), "| gl =", df_global, 
+    "| p-valor =", p_global, "\n")
+
+# Comparação de AIC entre as funções de ligação
+AIC(mod_logit, mod_probit, mod_cloglog)
+```
+A comparação com o modelo nulo resulta em $D_0 = 409,95$ ($df_0 = 296$) e $D_1 = 191,64$ ($df_1 = 278$), gerando uma estatística $G^2 = 218,31$ com $18$ graus de liberdade ($p < 0,0001$). Rejeita-se fortemente $H_0$, confirmando que o conjunto de covariáveis possui elevado poder explicativo. Além disso, a ligação logit apresentou o menor AIC ($229,64$) frente às ligações probit ($230,90$) e cloglog ($236,06$), sendo mantida como a ligação mais adequada.
+
+Antes de realizar qualquer poda de variáveis, analisamos o comportamento individual dos coeficientes no modelo completo com ligação logit:
+
+```{r}
+# Sumário estatístico do modelo completo
+summary(mod_logit)
+```
+
+O sumário do modelo completo revela que diversas covariáveis — como idade (`age`, $p = 0,578$), colesterol (`chol`, $p = 0,265$), glicemia em jejum (`fbs`, $p = 0,327$) e eletrocardiograma em repouso (`restecg`, $p > 0,21$) — não apresentaram significância estatística individual ao nível de $5\%$ quando ajustadas pelas demais. Esse comportamento indica a presença de variáveis redundantes e motiva a realização de um procedimento de seleção de variáveis para obter um modelo mais parcimonioso.
+
+## Seleção de Variáveis e Teste da Razão de Verossimilhanças
+
+Para obter um modelo mais parcimonioso sem perda significativa de capacidade explicativa, aplicamos o algoritmo de seleção sequencial (*stepwise* bidirecional) baseado na minimização do critério AIC. 
+
+Como na família Binomial o parâmetro de dispersão é conhecido ($\phi = 1$), a comparação formal entre o modelo reduzido ($H_0$) e o modelo completo ($H_1$) é realizada por meio do **Teste da Razão de Verosimilhanças**. A estatística de teste é dada pela diferença entre as devianzas residuais:
+
+$$G^2 = D_0 - D_1 \sim \chi^2_{\text{df}_0 - \text{df}_1}$$
+
+onde $D_0$ e $D_1$ representam as devianzas dos modelos reduzido e completo, respectivamente, e os graus de liberdade correspondem à diferença no número de parâmetros estimados entre ambos. Somente após validar pelo teste $\chi^2$ que a exclusão das variáveis não deteriora o ajuste, inspecionamos os coeficientes finais do modelo selecionado:
+
+```{r}
+# 1. Seleção stepwise baseada no AIC
+mod_reduzido <- step(mod_logit, direction = "both", trace = FALSE)
+
+# 2. Comparação formal via Teste da Razão de Verossimilhanças (TRV)
+anova(mod_reduzido, mod_logit, test = "Chisq")
+
+# 3. Sumário detalhado do modelo final validado
+summary(mod_reduzido)
+```
+O procedimento *stepwise* eliminou quatro covariáveis redundantes (`age`, `chol`, `fbs` e `restecg`), reduzindo o modelo em $5$ graus de liberdade. O Teste da Razão de Verossimilhanças entre o modelo reduzido ($D_0 = 195,98$) e o modelo completo ($D_1 = 191,64$) resultou em uma estatística $G^2 = 4,3412$ com $5$ graus de liberdade e $p\text{-valor} = 0,5014$. Como $p > 0,05$, não rejeitamos a hipótese nula de que os parâmetros removidos são conjuntamente iguais a zero, comprovando que a simplificação não compromete a qualidade do ajuste. Além disso, o critério AIC melhorou substancialmente, caindo de $229,64$ para $223,98$.
+
+Na Regressão Logística, os coeficientes estimados ($\hat{\beta}_j$) operam na escala do *log-odds*. Para obter uma interpretação direta e clinicamente aplicável, exponenciamos as estimativas pontuais e seus respectivos intervalos de confiança de $95\%$ (via perfil de verossimilhança) para obter as **Razões de Chances (*Odds Ratios* - OR)**:
+
+$$\text{OR}_j = \exp(\hat{\beta}_j)$$
+
+```{r}
+# Cálculo das Razões de Chances (OR) e Intervalos de Confiança de 95%
+or_tabela <- exp(cbind(OR = coef(mod_reduzido), confint(mod_reduzido)))
+round(or_tabela, 3)
+```
+A exponenciação dos parâmetros permite quantificar objetivamente os fatores de risco coronariano na amostra de Cleveland (mantendo as demais covariáveis constantes):
+
+* Sexo (sexMasculino): Pacientes do sexo masculino apresentam uma chance aproximadamente $4,18$ vezes maior ($\text{OR} = 4,180$; $\text{IC}_{95\%}: [1,626; 11,365]$) de desenvolver obstrução coronariana em comparação às mulheres.
+
+* Tipo de Dor Torácica (cpAssintomático): Pacientes assintomáticos possuem uma chance cerca de $8,79$ vezes superior ($\text{OR} = 8,791$; $\text{IC}_{95\%}: [2,535; 33,962]$) de diagnóstico positivo em relação ao grupo de referência (Angina Típica).
+
+* Número de Vasos Corados (ca): Para cada vaso principal adicional identificado na fluoroscopia, a chance de doença cardíaca aumenta em aproximadamente $3,45$ vezes ($\text{OR} = 3,445$; $\text{IC}_{95\%}: [2,126; 5,863]$).
+
+* Talasemia (thalDefeito Reversível): A presença de defeito reversível eleva a chance de doença em $3,91$ vezes ($\text{OR} = 3,908$; $\text{IC}_{95\%}: [1,748; 8,926]$) quando comparada a pacientes com fluxo normal.
 
 ## Critérios de comparação
 
