@@ -1,70 +1,305 @@
 ---
-title: "Análise Estatística por Modelos Lineares Generalizados"
+title: "Modelagem Estatística de Dados Clínicos via Modelos Lineares Generalizados"
+subtitle: "Análise Exploratória, Seleção e Diagnóstico Aplicados à Base de Doenças Cardíacas de Cleveland (UCI)"
 author:
-  - "Ananda Rivas"
-  - "Isabelle Sannier"
+  - name: "Ananda Rivas e Isabelle Sannier"
+    affiliation: "Departamento de Estatística"
+date: today
+date-format: "DD [de] MMMM [de] YYYY"
 lang: pt-BR
 format:
   pdf:
+    documentclass: article
+    papersize: a4
+    fontsize: 11pt
+    linestretch: 1.35
+    geometry:
+      - top=2.5cm
+      - bottom=2.5cm
+      - left=2.5cm
+      - right=2.5cm
     toc: true
+    toc-depth: 3
+    toc-title: "Sumário"
     number-sections: true
-    fontsize: 12pt
-    geometry: margin=2.5cm
     colorlinks: true
+    link-citations: true
+    linkcolor: "MidnightBlue"
+    urlcolor: "MidnightBlue"
+    citecolor: "MidnightBlue"
+    fig-pos: "H"
+    tbl-cap-location: top
+    fig-cap-location: bottom
+    code-block-bg: "#F8F9FA"
+    code-block-border-left: "#1B365D"
+    include-in-header:
+      text: |
+        \usepackage{fancyhdr}
+        \usepackage{titlesec}
+        \usepackage{xcolor}
+        \usepackage{booktabs}
+        \usepackage{float}
+        \usepackage{amsmath, amssymb}
+        
+        % Paleta de cores institucional
+        \definecolor{AzulMarinho}{HTML}{1B365D}
+        \definecolor{CinzaTexto}{HTML}{333333}
+        
+        % Estilização dos títulos de seção
+        \titleformat{\section}
+          {\color{AzulMarinho}\Large\bfseries}
+          {\thesection}{1em}{}[\titlerule]
+        \titleformat{\subsection}
+          {\color{AzulMarinho}\large\bfseries}
+          {\thesubsection}{1em}{}
+          
+        % Cabeçalho e Rodapé personalizados
+        \pagestyle{fancy}
+        \fancyhf{}
+        \fancyhead[L]{\small\color{gray} Análise Estatística por Modelos Lineares Generalizados}
+        \fancyhead[R]{\small\color{gray} Relatório Técnico}
+        \fancyfoot[C]{\small\color{gray} Página \thepage}
+        \renewcommand{\headrulewidth}{0.4pt}
+        \renewcommand{\footrulewidth}{0.4pt}
+        
+        % Evitar numeração duplicada nos títulos
+        \makeatletter
+        \renewcommand{\@seccntformat}[1]{\csname the#1\endcsname.\quad}
+        \makeatother
 bibliography: referencias.bib
+execute:
+  echo: true      # Oculta o código R por padrão (ideal para relatórios executivos/técnicos)
+  warning: false    # Oculta avisos do R
+  message: false    # Oculta mensagens de carregamento de pacotes
 ---
 
-# 1. Introdução
+\newpage
 
-Apresentação do problema estudado, contextualização
-e importância da análise estatística.
+# Introdução
+FALTA
 
-# 2. Objetivos
+Apresentação do problema estudado, contextualização e relevância da análise estatística.
 
-## 2.1 Objetivo geral
+::: {.callout-note appearance="simple"}
+## Resumo Executivo / Contextualização
+Utilize este bloco para destacar brevemente o problema central ou a motivação prática do estudo antes de entrar nos detalhes técnicos.
+:::
 
-...
+# Objetivos
 
-## 2.2 Objetivos específicos
+## Objetivo geral
 
-...
+Descrever de forma clara e direta o propósito principal da modelagem estatística.FALTA
 
-# 3. Fundamentação teórica
+## Objetivos específicos
 
-## 3.1 Modelos Lineares Generalizados
+- Identificar as variáveis explicativas relevantes através de análise exploratória;
+- Ajustar diferentes especificações de Modelos Lineares Generalizados (MLG);
+- Avaliar a qualidade do ajuste por meio de análise de resíduos e envelopes simulados;
+- Selecionar o modelo mais parcimonioso e adequado para interpretação e predição.
 
-...
+# Fundamentação teórica
+SO IDEIAS GERAIS FALTA MELHORAR
 
-## 3.2 Distribuições de probabilidade
+## Modelos Lineares Generalizados
 
-...
+Apresentação da estrutura dos MLGs compostos pelos três componentes fundamentais:
 
-## 3.3 Funções de ligação
+1. **Componente aleatório:** $Y_i$ pertencente à família exponencial de dispersão:
+   $$f(y_i; \theta_i, \phi) = \exp\left\{ \frac{y_i \theta_i - b(\theta_i)}{a(\phi)} + c(y_i, \phi) \right\}$$
+2. **Componente sistemático:** $\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}$.
+3. **Função de ligação:** $g(\mu_i) = \eta_i$.
 
-...
+## Distribuições de probabilidade
 
-# 4. Material e métodos
+Detalhamento das distribuições candidatas ao fenômeno estudado (ex.: Poisson, Binomial Negativa, Gamma ou Normal Inversa) e suas respectivas funções de variância $V(\mu)$.
 
-## 4.1 Descrição dos dados
+## Funções de ligação
 
-## 4.2 Análise exploratória
+Discussão sobre a ligação canônica e alternativas (ex.: ligação logarítmica, identidade, inversa) para garantir coerência no domínio da média $\mu_i$.
 
-## 4.3 Ajuste dos modelos
+# Material e métodos
+???
 
-## 4.4 Critérios de comparação
+## Descrição dos dados
 
-# 5. Resultados e discussão
+Nesta seção, apresentamos a origem dos dados utilizados e o procedimento de limpeza e tratamento prévio necessário para aplicar os Modelos Lineares Generalizados (MLG).
 
-## 5.1 Resultados da análise exploratória
+Os dados provêm do repositório oficial da UCI (*UCI Machine Learning Repository*) [@heart_disease_45], especificamente o banco de dados clínico de **Cleveland** (*Heart Disease Data*). A base original contém 303 observações e 14 variáveis clínicas coletadas com o objetivo de diagnosticar a presença de doença arterial coronariana.
 
-## 5.2 Ajuste dos modelos
+O bloco de código a seguir realiza a importação direta dos dados, exibe a estrutura inicial para validação das colunas e mapeia os códigos ausentes para `NA`:
 
-## 5.3 Diagnóstico dos modelos
+```{r dados}
+# Bloco robusto de importação e limpeza
+url_uci <- paste0("https://archive.ics.uci.edu/ml/",
+                  "machine-learning-databases/heart-disease/",
+                  "processed.cleveland.data")
 
-## 5.4 Comparação dos modelos
+# Tenta baixar com tratamento de erro
+dados_raw <- tryCatch({
+  read.csv(url_uci, header = FALSE, na.strings = "?")
+}, error = function(e) {
+  # Plano B caso a conexão falhe: avisa
+  stop("Erro ao baixar os dados da UCI. Verifique sua conexão com a internet.")
+})
 
-## 5.5 Interpretação dos resultados
+# Atribuindo os nomes das 14 variáveis selecionadas pela 
+# documentação da UCI
+nombres_cols <- c("age", "sex", "cp", "trestbps", "chol", "fbs", 
+                  "restecg", "thalach", "exang", "oldpeak", 
+                  "slope", "ca", "thal", "num")
+colnames(dados_raw) <- nombres_cols
 
-# 6. Conclusão
+# Inspeção inicial das primeiras linhas e estrutura da base bruta
+head(dados_raw, 3)
+str(dados_raw)
 
-# 7. Referências bibliográficas
+# Verificação explícita de quantas linhas possuem NA por variável
+colSums(is.na(dados_raw))
+```
+Como observado na estrutura inicial, a base possui 303 observações. A inspeção confirma que as colunas `ca` (número de vasos corados) e `thal` (talasemia) contêm os valores ausentes previstos pela documentação.Para manter a consistência metodológica do ajuste dos MLGs, o próximo passo consiste na remoção das linhas omissas (resultando em $n = 297$ observações completas) e na conversão rigorosa das variáveis. Conforme a especificación da UCI, colunas como `sex`, `cp` (tipo de dor torácica), `fbs` (glicemia), `restecg`, `exang`, `slope` e `thal` são na verdade códigos qualitativos discretos, e não medidas quantitativas contínuas. Portanto, é metodologicamente obrigatório convertê-las em fatores para evitar que o modelo assuma pressupostos lineares incorretos sobre categorias clínicas:
+
+```{r fatores}
+# Remoção de casos omissos 
+dados <- na.omit(dados_raw)
+
+# Conversão das variáveis qualitativas em fatores 
+dados$sex     <- factor(dados$sex, levels = c(0, 1),
+                        labels = c("Feminino", "Masculino"))
+dados$cp      <- factor(dados$cp, levels = c(1, 2, 3, 4), 
+                        labels = c("Angina Típica", "Angina Atípica",
+                                   "Não Anginosa", "Assintomático"))
+dados$fbs     <- factor(dados$fbs, levels = c(0, 1), 
+                        labels = c("<= 120", "> 120"))
+dados$restecg <- factor(dados$restecg)
+dados$exang   <- factor(dados$exang, levels = c(0, 1), 
+                        labels = c("Não", "Sim"))
+dados$slope   <- factor(dados$slope, levels = c(1, 2, 3), 
+                        labels = c("Ascendente", "Plana", "Descendente"))
+dados$thal    <- factor(dados$thal, levels = c(3, 6, 7), 
+                        labels = c("Normal", "Defeito Fixo",
+                                   "Defeito Reversível"))
+
+# Verificação final da estrutura tratada
+str(dados)
+
+# Dimensão final da base limpa
+dim(dados)
+
+colSums(is.na(dados))
+```
+Um ponto metodológico fundamental refere-se à binarização da Variável Resposta (`num`): No dataset original da UCI, a variável resposta `num` quantifica o diagnóstico de doença cardíaca em uma escala inteira de $0$ a $4$ (onde $0$ indica ausência de estreitamento significativo e $1$ a $4$ representam graus crescentes de obstrução arterial). Contudo, para a aplicação de um MLG com componente aleatório Binomial (como a Regressão Logística), é necessário que a resposta seja binária. Seguindo a convenção clínica padrão, binarizamos a resposta criando a variável `doenca`, onde atribuímos $0$ para pacientes saudáveis (`num` == 0) e $1$ para pacientes com qualquer grau de obstrução coronariana (`num` > 0).
+
+```{r resposta_bi}
+# Binarização da variável resposta conforme padrão clínico estabelecido:
+# 0 = sem doença (diâmetro de estrechamiento < 50%)
+# 1 = com doença (estrechamiento > 50% em qualquer vaso principal)
+dados$doenca <- ifelse(dados$num > 0, 1, 0)
+```
+
+## Análise exploratória
+
+Com a base de dados tratada e consistente ($n = 297$), realizamos uma análise exploratória para compreender a distribuição das principais covariáveis e sua associação preliminar com a presença de doença arterial coronariana (`doenca`).
+
+## Estatísticas Descritivas Iniciais
+
+Primeiramente, verificamos o panorama geral das variáveis contínuas da amostra (idade, pressão arterial, colesterol, frequência cardíaca máxima e depressão do segmento ST) por meio de medidas de posição e dispersão:
+
+```{r}
+# Resumo estatístico descritivo das variáveis contínuas
+summary(dados[, c("age", "trestbps", "chol", "thalach", "oldpeak")])
+```
+O resumo descritivo nos permite identificar faixas clínicas plausíveis, como a idade dos pacientes variando entre 29 e 77 anos, e níveis de colesterol sérico com valores que exigem atenção a possíveis assimetrias ou observações extremas (outliers).
+
+Adicionalmente, avaliamos a proporção global da nossa variável resposta na amostra limpa:
+
+```{r}
+# Tabela de frequências absolutas e relativas da resposta binarizada
+table(dados$doenca)
+prop.table(table(dados$doenca)) * 100
+```
+
+Constata-se um excelente balanceamento na amostra, onde cerca de $46.12\%$ dos pacientes apresentam diagnóstico positivo para doença cardíaca ($\text{doenca} = 1$) frente a $53.87\%$ de diagnósticos negativos ($\text{doenca} = 0$), o que mitiga problemas de desbalanceamento severo na estimação por verossimilhança da Regressão Logística.
+
+Para visualizar o impacto de covariáveis contínuas centrais sobre o desfecho clínico, utilizamos gráficos de densidade e boxplots
+
+```{r grafico_exploratorio}
+library(ggplot2)
+library(gridExtra)
+
+# Gráfico 1: Idade versus Diagnóstico
+p1 <- ggplot(dados, aes(x = factor(doenca, labels = c("Saudável", "Com Doença")), 
+                        y = age, fill = factor(doenca))) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  labs(title = "Idade por Diagnóstico", x = "", y = "Idade (anos)") +
+  theme_minimal()
+
+# Gráfico 2: Frequência Cardíaca Máxima versus Diagnóstico
+p2 <- ggplot(dados, aes(x = factor(doenca, labels = c("Saudável", "Com Doença")), 
+                        y = thalach, fill = factor(doenca))) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  labs(title = "Freq. Cardíaca Máx.", x = "", y = "Thalach (bpm)") +
+  theme_minimal()
+
+# Exibindo os gráficos lado a lado
+grid.arrange(p1, p2, ncol = 2)
+```
+Se pode observar que os pacientes com diagnóstico positivo tendem a apresentar distribuições de idade ligeiramente superiores e uma frequência cardíaca máxima (`thalach`) consideravelmente menor durante o esforço físico em comparação aos saudáveis.
+
+Como a base contém variáveis qualitativas cruciais, é essencial examinar sua associação com o desfecho. Analisamos o Tipo de Dor Torácica (`cp`), sabidamente um dos preditores clínicos mais importantes:
+
+```{r grafico_exploratorio_categorica}
+# Gráfico de barras empilhadas de proporção para o Tipo de Dor Torácica
+ggplot(dados, aes(x = cp, fill = factor(doenca, 
+                                        labels = c("Saudável", "Com Doença")))) +
+  geom_bar(position = "fill") +
+  labs(title = "Proporção de Doença por Tipo de Dor Torácica", 
+       x = "Tipo de Dor (cp)", y = "Proporção", fill = "Diagnóstico") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 15, hjust = 1))
+```
+O gráfico de proporções revela uma forte heterogeneidade na ocorrência de doença cardíaca entre as categorias de dor torácica (`cp`). Nota-se um contraste marcante e clinicamente relevante: enquanto pacientes que relatam sintomas clássicos como **Angina Típica** ($\approx 30\%$), **Angina Atípica** ($\approx 18\%$) ou **Dor Não Anginosa** ($\approx 22\%$) apresentam proporções minoritárias de diagnóstico positivo, o grupo **Assintomático** exibe uma incidência superior a **$72\%$** de obstrução coronariana. Essa disparidade acentuada confirma que a variável `cp` possui elevado poder discriminatório e justifica plenamente sua inclusão como fator categórico na etapa subsequente de modelagem via MLG.
+
+## Ajuste dos modelos
+
+Especificação do método de estimação  e das estruturas de modelos testadas no software **R**.
+
+## Critérios de comparação
+
+Definição das métricas utilizadas para seleção de modelos: *Deviance* escalada, Critério de Informação de Akaike ($\text{AIC}$), Critério de Informação Bayesiano ($\text{BIC}$) e testes de razão de verossimilhanças (TRV).
+
+# Resultados e discussão
+
+## Resultados da análise exploratória
+
+Apresentação das estatísticas descritivas e gráficos exploratórios principais.
+
+## Ajuste dos modelos
+
+Tabela comparativa com as estimativas dos parâmetros ($\hat{\beta}$), erros padrão, valores-$p$ e medidas de bondade de ajuste.
+
+## Diagnóstico dos modelos
+
+Avaliação da adequação do modelo selecionado utilizando resíduos componentes do desvio padronizados ($t_{Di}$), análise de pontos de alavanca ($h_{ii}$), distância de Cook ($LD_i$) e **envelopes simulados** (`hnp` ou resíduos quantílicos aleatorizados via `DHARMa`).
+
+## Comparação dos modelos
+
+Discussão objetiva sobre o desempenho relativo dos modelos candidatos com base nos critérios definidos na metodologia.
+
+## Interpretação dos resultados
+
+Tradução dos coeficientes estimados para a escala original do problema (ex.: razões de chances, razões de taxas $\exp(\hat{\beta}_j)$ e respectivos intervalos de confiança).
+
+::: {.callout-tip icon=false}
+## Principais Achados
+Destaque aqui as conclusões práticas mais relevantes extraídas dos parâmetros do modelo final.
+:::
+
+# Conclusão
+
+Síntese dos resultados alcançados em relação aos objetivos propostos, limitações do estudo e sugestões para trabalhos futuros.
+
+# Referências bibliográficas {.unnumbered}
+
+::: {#refs}
+:::
