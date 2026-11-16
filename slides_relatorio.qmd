@@ -50,7 +50,7 @@ header-includes:
     \IfFontExistsTF{Segoe UI}{
       \setsansfont{Segoe UI}
     }{
-      \setsansfont{Arial}
+      \setsansfont{Liberation Sans}
     }
 
     % ------------------------------------------------
@@ -190,7 +190,7 @@ execute:
 \begin{center}
   {\normalsize \color{textgray}\textbf{Ananda Rivas e Isabelle Sannier}}\\
   \vspace{0.1cm}
-  {\small \color{lightblue}15 de novembro de 2026}
+  {\small \color{lightblue}16 de novembro de 2026}
 \end{center}
 
 
@@ -208,6 +208,47 @@ library(tibble)
 darkblue <- "#2C4B4E"
 lightblue <- "#4A777A"
 clinicalred <- "#B22222"
+
+# Carregamento e preparação idênticos ao relatório oficial (n = 297)
+url_uci <- paste0(
+  "https://archive.ics.uci.edu/ml/",
+  "machine-learning-databases/heart-disease/",
+  "processed.cleveland.data"
+)
+
+dados_raw <- read.csv(
+  url_uci,
+  header = FALSE,
+  na.strings = "?",
+  stringsAsFactors = FALSE
+)
+names(dados_raw) <- c(
+  "age", "sex", "cp", "trestbps", "chol", "fbs",
+  "restecg", "thalach", "exang", "oldpeak",
+  "slope", "ca", "thal", "num"
+)
+
+dados <- na.omit(dados_raw)
+dados$sex <- factor(dados$sex, levels = c(0, 1), labels = c("Feminino", "Masculino"))
+dados$cp <- factor(
+  dados$cp, levels = c(1, 2, 3, 4),
+  labels = c("Angina Típica", "Angina Atípica", "Não Anginosa", "Assintomático")
+)
+dados$fbs <- factor(dados$fbs, levels = c(0, 1), labels = c("Até 120", "Acima de 120"))
+dados$restecg <- factor(dados$restecg)
+dados$exang <- factor(dados$exang, levels = c(0, 1), labels = c("Não", "Sim"))
+dados$slope <- factor(dados$slope, levels = c(1, 2, 3), labels = c("Ascendente", "Plana", "Descendente"))
+dados$ca <- as.numeric(dados$ca)
+dados$thal <- factor(dados$thal, levels = c(3, 6, 7), labels = c("Normal", "Defeito Fixo", "Defeito Reversível"))
+dados$doenca <- as.integer(ifelse(dados$num > 0, 1, 0))
+
+mod_logit <- glm(
+  doenca ~ age + sex + cp + trestbps + chol + fbs + restecg +
+    thalach + exang + oldpeak + slope + ca + thal,
+  family = binomial(link = "logit"),
+  data = dados
+)
+mod_reduzido <- step(mod_logit, direction = "both", trace = FALSE)
 
 # 1. Perfil da amostra
 perfil <- data.frame(
@@ -301,7 +342,28 @@ p_or <- ggplot(or_data, aes(OR, termo)) +
     plot.margin = margin(5, 12, 5, 5)
   )
 
-# 4. Análise de sensibilidade: coeficientes antes/depois
+# 4. Calibração descritiva por quintis (Tabela 13 do relatório)
+calib_data <- tibble(
+  Grupo = 1:5,
+  Proporcao_obs = c(0.0500, 0.0508, 0.3729, 0.8814, 0.9500),
+  Prob_est = c(0.0278, 0.1246, 0.3649, 0.8046, 0.9830)
+)
+
+p_calib <- ggplot(calib_data, aes(x = Prob_est, y = Proporcao_obs)) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = clinicalred, linewidth = 0.7) +
+  geom_point(color = darkblue, size = 3.2) +
+  scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.25)) +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.25)) +
+  coord_fixed() +
+  labs(x = "Probabilidade média estimada", y = "Proporção observada") +
+  theme_minimal(base_size = 10.5) +
+  theme(
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(color = darkblue),
+    axis.title = element_text(color = darkblue)
+  )
+
+# 5. Análise de sensibilidade: coeficientes antes/depois
 sens_data <- tibble(
   variavel = c(
     "Dor assintomática", "Dor assintomática",
@@ -341,6 +403,307 @@ p_sens <- ggplot(
     panel.grid.major.y = element_blank(),
     axis.text = element_text(color = darkblue)
   )
+
+# 6. Avaliação preditiva e curva ROC (70% treino / 30% teste, idêntico ao relatório)
+set.seed(2026)
+idx_0 <- which(dados$doenca == 0)
+idx_1 <- which(dados$doenca == 1)
+
+treino_idx <- c(
+  sample(idx_0, size = round(0.70 * length(idx_0))),
+  sample(idx_1, size = round(0.70 * length(idx_1)))
+)
+dados_treino <- dados[treino_idx, ]
+dados_teste <- dados[-treino_idx, ]
+
+mod_treino <- glm(formula(mod_reduzido), family = binomial(link = "logit"), data = dados_treino)
+prob_teste <- predict(mod_treino, newdata = dados_teste, type = "response")
+y_teste <- dados_teste$doenca
+
+calc_metricas <- function(y, prob, corte) {
+  pred <- ifelse(prob >= corte, 1L, 0L)
+  vp <- sum(y == 1L & pred == 1L)
+  vn <- sum(y == 0L & pred == 0L)
+  fp <- sum(y == 0L & pred == 1L)
+  fn <- sum(y == 1L & pred == 0L)
+  data.frame(
+    Corte = corte,
+    Acuracia = (vp + vn) / length(y),
+    Sensibilidade = vp / (vp + fn),
+    Especificidade = vn / (vn + fp)
+  )
+}
+
+cortes_grid <- sort(unique(c(1.0001, prob_teste, 0)), decreasing = TRUE)
+df_roc <- do.call(rbind, lapply(cortes_grid, function(c) calc_metricas(y_teste, prob_teste, c)))
+df_roc$TFP <- 1 - df_roc$Especificidade
+df_roc <- df_roc[order(df_roc$TFP, df_roc$Sensibilidade), ]
+auc_roc <- sum(diff(df_roc$TFP) * (head(df_roc$Sensibilidade, -1) + tail(df_roc$Sensibilidade, -1)) / 2)
+
+m_padrao <- calc_metricas(y_teste, prob_teste, 0.50)
+ponto_50 <- data.frame(
+  TFP = 1 - m_padrao$Especificidade,
+  Sensibilidade = m_padrao$Sensibilidade,
+  Label = "Corte 0,50 / Youden (0,51)"
+)
+
+p_roc <- ggplot(df_roc, aes(x = TFP, y = Sensibilidade)) +
+  geom_ribbon(aes(ymin = 0, ymax = Sensibilidade), fill = lightblue, alpha = 0.16) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey60", linewidth = 0.5) +
+  geom_step(color = darkblue, linewidth = 0.9) +
+  geom_point(
+    data = ponto_50,
+    aes(x = TFP, y = Sensibilidade, shape = Label),
+    color = clinicalred, fill = "white", size = 3, stroke = 1.1
+  ) +
+  scale_shape_manual(values = 21) +
+  scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2), expand = c(0, 0)) +
+  coord_fixed(clip = "off") +
+  annotate(
+    "text", x = 0.96, y = 0.25, hjust = 1,
+    label = sub("\\.", ",", sprintf("AUC = %.3f", auc_roc)),
+    color = darkblue, fontface = "bold", size = 3.8
+  ) +
+  labs(x = "1 - Especificidade", y = "Sensibilidade", shape = NULL) +
+  theme_bw(base_size = 10.5) +
+  theme(
+    panel.grid = element_blank(),
+    panel.border = element_rect(color = darkblue, linewidth = 0.6),
+    axis.ticks = element_line(color = darkblue, linewidth = 0.5),
+    axis.text = element_text(color = darkblue),
+    axis.title = element_text(color = darkblue),
+    legend.position = c(0.97, 0.04),
+    legend.justification = c(1, 0),
+    legend.background = element_rect(fill = "white", color = "grey80", linewidth = 0.3),
+    legend.key = element_blank(),
+    legend.text = element_text(size = 8.5, color = darkblue),
+    legend.margin = margin(3, 5, 3, 5)
+  )
+
+# envelope
+
+set.seed(2026)
+
+X <- model.matrix(mod_reduzido)
+n <- nrow(X)
+prob_ajustada <- fitted(mod_reduzido)
+
+# Componente do desvio padronizado observado (phi = 1 para Bernoulli)
+td <- rstandard(mod_reduzido, type = "deviance")
+
+# Simulação do envelope (1.000 réplicas)
+m <- 1000
+e <- matrix(0, nrow = n, ncol = m)
+
+for (i in seq_len(m)) {
+  resp <- rbinom(n, size = 1, prob = prob_ajustada)
+  fit_sim <- suppressWarnings(
+    glm.fit(x = X, y = resp, family = binomial(link = "logit"))
+  )
+  class(fit_sim) <- c("glm", "lm")
+
+  res_dev <- residuals(fit_sim, type = "deviance")
+  h_sim <- pmin(hatvalues(fit_sim), 1 - .Machine$double.eps)
+  e[, i] <- sort(res_dev / sqrt(1 - h_sim))
+}
+
+# Bandas de 95% de confiança e média dos percentis simulados
+e1 <- apply(e, 1, quantile, probs = 0.025, names = FALSE)
+e2 <- apply(e, 1, quantile, probs = 0.975, names = FALSE)
+med <- rowMeans(e)
+
+df_envelope <- data.frame(
+  Percentis_N01 = sort(qqnorm(td, plot.it = FALSE)$x),
+  Residuo_obs = sort(td),
+  Limite_inf = e1,
+  Limite_sup = e2,
+  Media_sim = med
+)
+
+envelope <- ggplot(df_envelope, aes(x = Percentis_N01)) +
+  geom_ribbon(
+    aes(ymin = Limite_inf, ymax = Limite_sup),
+    fill = "#8FB8DE",
+    alpha = 0.25
+  ) +
+  geom_line(
+    aes(y = Limite_inf),
+    color = "#B23A48",
+    linetype = "solid",
+    linewidth = 0.65
+  ) +
+  geom_line(
+    aes(y = Limite_sup),
+    color = "#B23A48",
+    linetype = "solid",
+    linewidth = 0.65
+  ) +
+  geom_line(
+    aes(y = Media_sim),
+    color = "#1B365D",
+    linetype = "dashed",
+    linewidth = 0.65
+  ) +
+  geom_point(
+    aes(y = Residuo_obs),
+    color = "#1B365D",
+    alpha = 0.75,
+    size = 1.8
+  ) +
+  labs(
+    x = "Percentis da N(0,1)",
+    y = "Componente do desvio padronizado"
+  ) +
+  theme_light(base_size = 12)
+
+# residuo deviance vs ajustado
+
+residuos_dev <- residuals(mod_reduzido, type = "deviance")
+valores_ajustados <- fitted(mod_reduzido)
+
+df_residuos <- data.frame(
+  valores_ajustados = valores_ajustados,
+  residuos_dev = residuos_dev
+)
+
+residuo_deviance_ajustado <- ggplot(df_residuos, aes(x = valores_ajustados, y = residuos_dev)) +
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed",
+    color = "#B23A48",
+    linewidth = 0.7
+  ) +
+  geom_point(color = "#1B365D", alpha = 0.7, size = 2) +
+  scale_x_continuous(limits = c(0, 1), expand = expansion(mult = c(0.02, 0.02))) +
+  labs(
+    x = "Probabilidade ajustada",
+    y = "Resíduo de deviance"
+  ) +
+  theme_light(base_size = 12)
+
+# descritiva numerica
+
+dados$diagnostico <- factor(
+  dados$doenca, levels = c(0, 1),
+  labels = c("Sem diagnóstico positivo", "Com diagnóstico positivo")
+)
+
+vars_plot <- c("age", "thalach", "trestbps", "chol", "oldpeak")
+rotulos_vars <- c(
+  age = "Idade (anos)",
+  thalach = "Frequência cardíaca máxima",
+  trestbps = "Pressão arterial em repouso",
+  chol = "Colesterol sérico",
+  oldpeak = "Depressão do segmento ST "
+)
+
+dados_long <- do.call(
+  rbind,
+  lapply(vars_plot, function(v) {
+    data.frame(
+      diagnostico = dados$diagnostico,
+      Variavel = factor(rotulos_vars[v], levels = rotulos_vars),
+      Valor = dados[[v]]
+    )
+  })
+)
+
+paleta_azul <- c(
+  "Sem diagnóstico positivo" = "#8FB8DE",
+  "Com diagnóstico positivo" = "#1B365D"
+)
+
+desc_numerica <- ggplot(dados_long, aes(x = diagnostico, y = Valor, fill = diagnostico)) +
+  geom_boxplot(show.legend = FALSE, alpha = 0.82, width = 0.5) +
+  scale_fill_manual(values = paleta_azul) +
+  scale_x_discrete(labels = c(
+    "Sem diagnóstico positivo" = "Sem diagnóstico\npositivo",
+    "Com diagnóstico positivo" = "Com diagnóstico\npositivo"
+  )) +
+  facet_wrap(~ Variavel, scales = "free_y", ncol = 3) +
+  labs(x = NULL, y = NULL) +
+  theme_light()
+
+# descritiva categorica
+
+paleta_azul <- c(
+  "Sem diagnóstico positivo" = "#8FB8DE",
+  "Com diagnóstico positivo" = "#1B365D"
+)
+
+niveis_cat <- c(
+  "Feminino", "Masculino",
+  "Angina Típica", "Angina Atípica", "Não Anginosa", "Assintomático",
+  "Até 120", "Acima de 120",
+  "0", "1", "2",
+  "Não", "Sim",
+  "Ascendente", "Plana", "Descendente",
+  "Normal", "Defeito Fixo", "Defeito Reversível"
+)
+
+rotulos_cat <- c(
+  "Feminino" = "Feminino",
+  "Masculino" = "Masculino",
+  "Angina Típica" = "Angina\nTípica",
+  "Angina Atípica" = "Angina\nAtípica",
+  "Não Anginosa" = "Não\nAnginosa",
+  "Assintomático" = "Assintomático",
+  "Até 120" = "Até 120",
+  "Acima de 120" = "Acima\nde 120",
+  "0" = "0",
+  "1" = "1",
+  "2" = "2",
+  "Não" = "Não",
+  "Sim" = "Sim",
+  "Ascendente" = "Ascendente",
+  "Plana" = "Plana",
+  "Descendente" = "Descendente",
+  "Normal" = "Normal",
+  "Defeito Fixo" = "Defeito\nFixo",
+  "Defeito Reversível" = "Defeito\nReversível"
+)
+
+variaveis_categoricas <- c(
+  "sex", "cp", "fbs", "restecg", "exang", "slope", "thal"
+)
+
+nomes_categoricas <- c(
+  sex = "Sexo (sex)",
+  cp = "Tipo de dor torácica (cp)",
+  fbs = "Glicemia em jejum (fbs)",
+  restecg = "ECG em repouso (restecg)",
+  exang = "Angina por exercício (exang)",
+  slope = "Inclinação do segmento ST (slope)",
+  thal = "Talassemia (thal)"
+)
+
+dados_cat_long <- do.call(
+  rbind,
+  lapply(variaveis_categoricas, function(v) {
+    data.frame(
+      diagnostico = dados$diagnostico,
+      Variavel = factor(nomes_categoricas[v], levels = nomes_categoricas),
+      Categoria = factor(as.character(dados[[v]]), levels = niveis_cat)
+    )
+  })
+)
+
+desc_cat <- ggplot(dados_cat_long, aes(x = Categoria, fill = diagnostico)) +
+  geom_bar(position = "fill", width = 0.55) +
+  scale_fill_manual(values = paleta_azul) +
+  scale_x_discrete(labels = rotulos_cat) +
+  scale_y_continuous(limits = c(0, 1), expand = expansion(mult = c(0, 0.05))) +
+  facet_wrap(~ Variavel, scales = "free_x", ncol = 3) +
+  labs(
+    x = NULL,
+    y = "Proporção dentro da categoria",
+    fill = "Diagnóstico"
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "bottom")
+
 ```
 
 # Contexto e dados
@@ -395,7 +758,7 @@ p_sens <- ggplot(
 - Foram utilizados casos completos para que os modelos fossem comparados sobre a mesma amostra.
 
 \begin{graybox}
-A exclusão dos seis registros ocorreu devido à presença de valores ausentes nas variáveis utilizadas.
+Apenas duas variáveis apresentaram valores ausentes: \texttt{ca} (4 ocorrências) e \texttt{thal} (2 ocorrências), totalizando 6 registros incompletos ($\approx 2{,}0\%$ da base).
 \end{graybox}
 
 ## Por que utilizar um MLG?
@@ -431,7 +794,7 @@ $$
 \texttt{doenca}=0 \text{ se } \texttt{num}=0
 $$
 $$
-\texttt{doenca}=1 \text{ se } \texttt{num}>0
+\texttt{doenca}=1 \text{ se } \texttt{num} \textgreater 0
 $$
 :::
 ::: {.column width="58%"}
@@ -444,29 +807,49 @@ p_perfil
 :::
 :::
 
-## Pistas iniciais: diferenças entre os grupos
+## Diferenças entre os grupos
 
 \begin{itemize}
-\item A idade média foi maior no grupo com doença (56,8 contra 52,6 anos).
-\item O grupo com doença apresentou menor frequência cardíaca máxima (`thalach`) e maior depressão do segmento ST (`oldpeak`).
-\item As categorias de dor torácica assintomática e talassemia reversível apareceram associadas a maior proporção de diagnósticos positivos.
+\item Pacientes com diagnóstico positivo apresentaram maior idade média ($56{,}8$ vs. $52{,}6$ anos), menor frequência cardíaca máxima (\texttt{thalach}: $139{,}1$ vs. $158{,}6$ bpm) e maior depressão do segmento ST (\texttt{oldpeak}: $1{,}59$ vs. $0{,}60$ mm).
+\item A prevalência de diagnóstico positivo foi mais que o dobro entre homens ($55{,}7\%$ vs. $26{,}0\%$) e concentrou-se em dor assintomática ($72{,}5\%$), angina por exercício ($76{,}3\%$) e defeito reversível na talassemia ($76{,}5\%$).
+\item Glicemia em jejum (\texttt{fbs}: $46{,}5\%$ vs. $46{,}1\%$) e colesterol sérico exibiram forte sobreposição marginal entre os grupos.
 \end{itemize}
 
 \begin{graybox}
-Essas observações são descritivas. A avaliação conjunta das associações é realizada posteriormente pelo modelo.
+Esses contrastes descritivos orientam a modelagem multivariada, que avalia o efeito condicional de cada covariável.
 \end{graybox}
+
+## Distribuição das variáveis quantitativas por categoria do diagnóstico
+
+```{r}
+#| fig-width: 7
+#| fig-height: 3.6
+#| out-width: 90%
+#| fig-align: "center"
+desc_numerica
+```
+
+## Proporção do diagnóstico por categoria das variáveis qualitativas
+
+```{r}
+#| fig-width: 7
+#| fig-height: 4.5
+#| out-width: 80%
+#| fig-align: "center"
+desc_cat
+```
 
 ## Correlações entre variáveis quantitativas
 
 | Par de variáveis | Correlação de Spearman |
 |:--|--:|
-| `thalach` × `oldpeak` | -0,44 |
-| Idade × `thalach` | -0,39 |
-| Idade × `ca` | 0,38 |
-| Idade × `trestbps` | 0,30 |
+| `thalach` $\times$ `oldpeak` | -0,44 |
+| Idade $\times$ `thalach` | -0,39 |
+| Idade $\times$ `ca` | 0,38 |
+| Idade $\times$ `trestbps` | 0,30 |
 
 \begin{bluebox}
-As associações observadas são moderadas. A matriz de correlação, isoladamente, não permite concluir que exista ou não multicolinearidade severa no modelo; essa avaliação exige diagnóstico conjunto.
+As correlações monotônicas são de magnitude fraca a moderada ($|r_s| \le 0{,}44$), não indicando problemas severos de colinearidade entre os preditores quantitativos.
 \end{bluebox}
 
 # Modelagem e seleção
@@ -504,11 +887,11 @@ p_link
 Foram ajustados modelos binomiais com três funções de ligação:
 
 - Logit: AIC = 229,64
-- Probit: AIC = 230,90
+- Probit: AIC = 230,90 
 - Complementar log-log: AIC = 236,06
 
 \begin{bluebox}
-O modelo logit apresentou o menor AIC entre as especificações comparadas.
+A curva simétrica logit apresentou o melhor ajuste em todos os critérios avaliados.
 \end{bluebox}
 :::
 :::
@@ -519,17 +902,17 @@ O modelo logit apresentou o menor AIC entre as especificações comparadas.
 |:--|--:|
 | Deviance nula | 409,95 |
 | Deviance residual | 191,64 |
-| Estatística da razão de verossimilhanças | 218,30 |
+| Estatística da razão de verossimilhanças ($G^2$) | 218,30 |
 | Graus de liberdade | 18 |
 | Valor-p | < 0,0001 |
 
 \begin{bluebox}
-O teste da razão de verossimilhanças indica melhora estatisticamente significativa em relação ao modelo nulo. O conjunto de variáveis contribui para explicar o desfecho.
+Rejeita-se a hipótese de nulidade simultânea dos coeficientes ($p < 0{,}0001$): o conjunto de variáveis clínicas e demográficas explica parcela substancial da variabilidade do diagnóstico.
 \end{bluebox}
 
 ## Do modelo completo ao modelo reduzido
 \vspace{-0.5cm}
-A seleção stepwise baseada no AIC removeu quatro variáveis:
+A seleção *stepwise* bidirecional baseada no AIC removeu quatro variáveis:
 
 - Removidas: `age`, `chol`, `fbs` e `restecg`.
 - Mantidas: `sex`, `cp`, `trestbps`, `thalach`, `exang`, `oldpeak`, `slope`, `ca` e `thal`.
@@ -538,6 +921,7 @@ A seleção stepwise baseada no AIC removeu quatro variáveis:
 ::: {.column width="45%"}
 | Critério | Completo | Reduzido |
 |:--|--:|--:|
+| Parâmetros | 19 | **14** |
 | Deviance residual | 191,64 | 195,98 |
 | AIC | 229,64 | **223,98** |
 | BIC | 299,82 | **275,70** |
@@ -547,13 +931,13 @@ A seleção stepwise baseada no AIC removeu quatro variáveis:
 \textbf{Comparação por razão de verossimilhanças}
 
 $$
-\Delta D=4,34
+\Delta D = 4{,}34
 $$
 $$
-GL=5,\quad p=0,5014
+\text{GL} = 5,\quad p = 0{,}5014
 $$
 
-Não foi detectada perda estatisticamente significativa de ajuste ao utilizar o modelo reduzido.
+A eliminação de 5 parâmetros preserva a qualidade de ajuste do modelo completo com maior parcimônia.
 \end{bluebox}
 :::
 :::
@@ -564,7 +948,7 @@ Não foi detectada perda estatisticamente significativa de ajuste ao utilizar o 
 
 ```{r}
 #| fig-width: 8.5
-#| fig-height: 4.2
+#| fig-height: 3.65
 #| out-width: 100%
 p_or
 ```
@@ -580,14 +964,14 @@ p_or
 \keynumber{4,18}{OR para sexo masculino}
 
 \begin{graybox}
-Mantendo as demais variáveis constantes, as chances estimadas de doença foram 4,18 vezes as do grupo feminino.
+Mantendo as demais variáveis constantes, as chances estimadas de doença entre homens foram 4,18 vezes as das mulheres (IC 95\%: 1,63 a 11,46).
 \end{graybox}
 :::
 ::: {.column width="50%"}
 \keynumber{3,45}{OR por vaso adicional (`ca`)}
 
 \begin{graybox}
-Cada vaso adicional está associado a chances estimadas 3,45 vezes maiores, sob a hipótese de efeito linear no logit.
+Cada vaso adicional na fluoroscopia multiplica as chances estimadas por 3,45 (IC 95\%: 2,14 a 5,87; $p < 0{,}0001$).
 \end{graybox}
 :::
 :::
@@ -598,33 +982,59 @@ Cada vaso adicional está associado a chances estimadas 3,45 vezes maiores, sob 
 
 ## Resultados sem significância a 5\%
 
-| Variável | Valor-p |
-|:--|--:|
-| Dor torácica atípica | 0,088 |
-| Frequência cardíaca máxima (`thalach`) | 0,139 |
-| Angina induzida por exercício (`exang`) | 0,122 |
-| Depressão ST (`oldpeak`) | 0,077 |
-| Inclinação descendente (`slope`) | 0,614 |
+| Variável | OR | Valor-p |
+|:--|--:|--:|
+| Dor torácica atípica | 3,638 | 0,0881 |
+| Depressão ST (`oldpeak`) | 1,481 | 0,0775 |
+| Angina induzida por exercício (`exang`) | 1,953 | 0,1218 |
+| Frequência cardíaca máxima (`thalach`) | 0,985 | 0,1391 |
+| Inclinação descendente (`slope`) | 1,570 | 0,6138 |
 
 \begin{graybox}
-Uma variável pode permanecer no modelo reduzido mesmo sem apresentar significância individual a 5\%. A seleção por AIC e o teste individual de coeficientes respondem a critérios diferentes.
+Essas covariáveis exibem sinais clinicamente coerentes e contribuem para a redução do AIC global, embora seus intervalos de confiança de 95\% englobem a unidade.
 \end{graybox}
 
-# Diagnóstico e limitações
+# Diagnóstico, validação e limitações
 
 ## Resíduos e envelope simulado
 
-- Os resíduos de deviance aparecem em duas faixas, comportamento esperado para uma resposta binária.
-- No envelope half-normal, a maior parte dos pontos permaneceu dentro da banda simulada de 95\%.
-- Não foram observados desvios visuais acentuados que, isoladamente, indiquem falta de ajuste severa.
+- No gráfico normal de probabilidades com **envelope simulado de 95%** (1.000 réplicas), a quase totalidade dos resíduos de deviance padronizados permaneceu dentro da banda esperada.
+- Apenas pontos isolados tangenciaram as bordas nas caudas (percentis $-2{,}5$ a $-2{,}0$ e $2{,}0$), compatível com flutuação amostral.
+- Os resíduos de deviance vs. valores ajustados concentraram-se em $[-2, 2]$, sem curvaturas sistemáticas.
 
 \begin{bluebox}
-O diagnóstico deve ser interpretado em conjunto com as medidas de alavancagem e influência. A presença de alguns resíduos mais afastados não demonstra, por si só, especificação incorreta.
+O diagnóstico residual confirma a adequação da função de ligação logit e da estrutura de variância binomial do modelo reduzido.
 \end{bluebox}
 
-## Existem observações potencialmente influentes?
+## Envelope simulado
 
-Foram investigadas observações com distância de Cook acima da referência $4/n=0,0135$.
+```{r}
+#| fig-cap: "Gráfico normal de probabilidades com envelope simulado de 95% para os resíduos de deviance padronizados"
+#| fig-width: 5
+#| fig-height: 3.5
+#| out-width: "60%"
+#| fig-align: "center"
+
+envelope
+```
+
+## Resíduos de deviance vs. valores ajustados
+
+```{r}
+#| fig-cap: "Resíduos de deviance versus valores ajustados"
+#| fig-width: 6
+#| fig-height: 3.6
+#| out-width: "60%"
+#| fig-align: "center"
+
+residuo_deviance_ajustado
+
+```
+
+
+## Alavancagem e distância de Cook
+
+Foram inspecionadas as observações com distância de Cook acima da referência $4/n = 0{,}0135$:
 
 | Observação | Distância de Cook | Alavancagem |
 |--:|--:|--:|
@@ -636,12 +1046,40 @@ Foram investigadas observações com distância de Cook acima da referência $4/
 | 268 | 0,0283 | 0,2068 |
 
 \begin{graybox}
-Esses casos foram examinados como observações potencialmente influentes, sem exclusão automática.
+Esses casos foram examinados como observações potencialmente influentes, sem exclusão automática. 
 \end{graybox}
 
-## Análise de sensibilidade
+## Calibração descritiva por quintis
+\vspace{-0.4cm}
+::: columns
+::: {.column width="52%"}
+Comparação entre probabilidades médias estimadas e proporções observadas em cinco grupos de risco:
+
+| Quintil | Proporção obs. | Prob. média est. |
+|:--:|--:|--:|
+| 1 | 0,0500 | 0,0278 |
+| 2 | 0,0508 | 0,1246 |
+| 3 | 0,3729 | 0,3649 |
+| 4 | 0,8814 | 0,8046 |
+| 5 | 0,9500 | 0,9830 |
+
+\begin{bluebox}
+Boa aderência à diagonal em toda a escala de risco, discriminando eficazmente pacientes de baixo e alto risco.
+\end{bluebox}
+:::
+::: {.column width="48%"}
+```{r}
+#| fig-width: 4.6
+#| fig-height: 4.1
+#| out-width: 98%
+p_calib
+```
+:::
+:::
+
+## Sensibilidade a pontos influentes
 \vspace{-0.5cm}
-O modelo foi reestimado após a remoção das três observações com maiores distâncias de Cook: 182, 197 e 92.
+O modelo foi reestimado após a remoção conjunta das três observações com maiores distâncias de Cook (`182`, `197` e `92`):
 
 ::: columns
 ::: {.column width="57%"}
@@ -656,38 +1094,71 @@ p_sens
 \begin{bluebox}
 \textbf{Principais observações}
 
-- Não houve inversão de sinal dos coeficientes.
+- Não houve inversão de sinal em nenhum parâmetro.
 
-- O coeficiente de sexo masculino mudou pouco.
+- Os preditores relevantes mantiveram direção e ordem de magnitude.
 
-- Algumas estimativas, como dor não anginosa e inclinação descendente, apresentaram mudanças maiores.
-
+- Variações percentuais maiores ocorreram apenas em termos não significativos (\texttt{cpNão Anginosa} e \texttt{slopeDescendente}).
 \end{bluebox}
+:::
+:::
+
+## Sensibilidade à forma funcional e codificação de `ca`
+
+| Especificação | Parâmetros | Deviance | AIC | BIC |
+|:--|--:|--:|--:|--:|
+| Modelo reduzido (`ca` linear) | 14 | 195,98 | 223,98 | **275,70** |
+| *Splines* naturais (`trestbps`, `thalach`, `oldpeak`) | 17 | 194,93 | 228,93 | 291,73 |
+| `ca` categórico (`factor(ca)`) | 16 | 187,74 | **219,74** | 278,84 |
+
+\small
+\textbf{Contínuas lineares:} \textit{splines} naturais não melhoram o ajuste ($G^2 = 1{,}05$; $p = 0{,}789$), validando a forma linear.
+\textbf{Codificação de \texttt{ca}:} o formato categórico reduz o AIC ($p = 0{,}0162$; $\text{OR} = 8{,}69$ em 1 vaso), mas poucos negativos em \texttt{ca = 3} ($n = 3$) alargam os ICs e pioram o BIC; mantém-se o termo linear.
+
+## Avaliação preditiva e curva ROC (70% treino / 30% teste)
+\vspace{-0.4cm}
+::: columns
+::: {.column width="50%"}
+Partição estratificada em treino ($n = 208$) e teste ($n = 89$):
+
+| Métrica (corte 0,50 / Youden 0,51) | Valor |
+|:--|--:|
+| **AUC** | **0,892** |
+| Acurácia global | 85,4\% |
+| Sensibilidade | 80,5\% |
+| Especificidade | 89,6\% |
+| Valor preditivo positivo (VPP) | 86,8\% |
+| Valor preditivo negativo (VPN) | 84,3\% |
+
+\begin{bluebox}
+Elevada capacidade discriminativa fora da amostra de ajuste ($\mathrm{AUC} = 0{,}892$).
+\end{bluebox}
+:::
+::: {.column width="50%"}
+```{r}
+#| fig-width: 4.8
+#| fig-height: 4.3
+#| out-width: 98%
+p_roc
+```
 :::
 :::
 
 ## Limitações do estudo
 
 - **Amostra:** os dados são da população clínica de Cleveland; a generalização deve ser cautelosa.
-- **Dados ausentes:** a análise de casos completos excluiu seis observações.
+- **Dados ausentes:** a análise de casos completos excluiu seis observações ($2{,}0\%$).
 - **Dicotomização:** a recodificação de `num` elimina informação sobre os níveis originais de gravidade.
 - **Seleção stepwise:** pode produzir estimativas e valores-p otimistas.
 - **Variável `ca`:** foi tratada como numérica, assumindo efeito linear no logit por vaso adicional.
 
-# Considerações finais
-
-## Três mensagens para levar
+## Considerações finais
 
 \begin{enumerate}
-\item Entre as funções de ligação avaliadas, o \textbf{logit} apresentou o menor AIC.
-\item O \textbf{modelo reduzido} apresentou menores AIC e BIC, sem evidência de perda significativa de ajuste no teste de razão de verossimilhanças.
-\item Características clínicas como tipo de dor torácica, número de vasos e talassemia apresentaram associações ajustadas relevantes com o desfecho.
+\item A ligação \textbf{logit} obteve o melhor ajuste e a seleção \textit{stepwise} reduziu o modelo de 19 para 14 parâmetros ($\mathrm{AIC} = 223{,}98$; $\mathrm{BIC} = 275{,}70$) sem perda significativa de ajuste ($p = 0{,}5014$).
+\item Número de vasos (\texttt{ca}), dor torácica assintomática, sexo masculino, defeito reversível na talassemia, inclinação plana do segmento ST e pressão arterial associaram-se positivamente às chances do diagnóstico.
+\item O modelo apresentou resíduos adequados no envelope de 95\%, boa calibração por quintis, robustez nas análises de sensibilidade e elevada discriminação fora da amostra ($\mathrm{AUC} = 0{,}892$; acurácia de $85{,}4\%$).
 \end{enumerate}
-
-\begin{bluebox}
-\centering
-\textbf{Os MLG oferecem uma estrutura útil para estudar associações clínicas, desde que seus resultados sejam interpretados considerando as hipóteses, a amostra e as limitações do estudo.}
-\end{bluebox}
 
 ## Referências
 

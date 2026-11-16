@@ -383,6 +383,8 @@ Inicialmente, foram calculadas estatísticas descritivas e elaborados gráficos 
 
 A seleção de variáveis foi conduzida pelo procedimento *stepwise* bidirecional baseado no AIC. Como esse procedimento é orientado pelos dados, o modelo selecionado deve ser interpretado como uma especificação exploratória, e não como identificação definitiva de um conjunto de fatores causais. Por fim, foram examinadas medidas de ajuste, resíduos, alavancagem e influência.
 
+Por fim, foram examinadas medidas de ajuste, resíduos, alavancagem e influência, bem como o desempenho discriminativo do modelo final por meio da curva ROC, sensibilidade e especificidade em partição estratificada de treino (70%) e teste (30%).
+
 # Resultados e discussão
 
 ## Análise exploratória
@@ -477,12 +479,13 @@ dados$diagnostico <- factor(
   labels = c("Sem diagnóstico positivo", "Com diagnóstico positivo")
 )
 
-vars_plot <- c("age", "thalach", "trestbps", "chol")
+vars_plot <- c("age", "thalach", "trestbps", "chol", "oldpeak")
 rotulos_vars <- c(
   age = "Idade (anos)",
   thalach = "Frequência cardíaca máxima",
   trestbps = "Pressão arterial em repouso",
-  chol = "Colesterol sérico"
+  chol = "Colesterol sérico",
+  oldpeak = "Depressão do segmento ST "
 )
 
 dados_long <- do.call(
@@ -1262,6 +1265,145 @@ knitr::kable(
 
 A inclusão de splines naturais nas covariáveis contínuas não produziu melhora significativa em relação ao ajuste linear ($G^2 = 1{,}05$; $\text{gl} = 3$; $p = 0{,}789$), elevando o AIC de $223{,}98$ para $228{,}93$ e confirmando a adequação da forma funcional linear para trestbps, thalach e oldpeak.Por outro lado, a parametrização categórica de ca reduziu significativamente a deviance ($G^2 = 8{,}24$; $\text{gl} = 2$; $p = 0{,}0162$) e melhorou o AIC ($219{,}74$ contra $223{,}98$), evidenciando um efeito de limiar: as razões de chances saltam acentuadamente já com um vaso comprometido ($\mathrm{OR} = 8{,}69$; IC 95%: $3{,}40$ a $23{,}76$) e atingem o pico em dois vasos ($\mathrm{OR} = 18{,}93$; IC 95%: $4{,}90$ a $84{,}13$), estabilizando em três vasos ($\mathrm{OR} = 7{,}42$; IC 95%: $1{,}49$ a $53{,}50$). Entretanto, devido à baixa contagem de casos negativos em ca = 3 ($n = 3$) — que alarga os intervalos de confiança e faz o BIC favorecer a especificação mais parcimoniosa ($275{,}70$ contra $278{,}84$) — e à preservação integral dos sinais e conclusões das demais covariáveis, mantém-se o termo linear de ca no modelo principal.
 
+## Avaliação preditiva e curva ROC
+
+Para avaliar a capacidade discriminativa do modelo logístico reduzido fora da amostra de ajuste, o conjunto de dados ($n = 297$) foi particionado de forma estratificada segundo o desfecho em 70% para treino ($n = 208$; $112$ sem diagnóstico e $96$ com diagnóstico positivo) e 30% para teste ($n = 89$; $48$ sem diagnóstico e $41$ com diagnóstico positivo). A especificação selecionada (`mod_reduzido`) foi reestimada exclusivamente na amostra de treino e aplicada para prever as probabilidades individuais na amostra de teste.
+
+```{r}
+#| tbl-cap: "Desempenho preditivo do modelo logístico reduzido na amostra de teste (30%, n = 89) segundo diferentes pontos de corte"
+set.seed(2026)
+
+# Partição estratificada 70% treino / 30% teste
+idx_0 <- which(dados$doenca == 0)
+idx_1 <- which(dados$doenca == 1)
+
+treino_idx <- c(
+  sample(idx_0, size = round(0.70 * length(idx_0))),
+  sample(idx_1, size = round(0.70 * length(idx_1)))
+)
+
+dados_treino <- dados[treino_idx, ]
+dados_teste <- dados[-treino_idx, ]
+
+# Reajuste do modelo reduzido apenas nos dados de treino
+mod_treino <- glm(
+  formula(mod_reduzido),
+  family = binomial(link = "logit"),
+  data = dados_treino
+)
+
+prob_teste <- predict(mod_treino, newdata = dados_teste, type = "response")
+y_teste <- dados_teste$doenca
+
+# Função auxiliar para métricas de classificação
+calc_metricas <- function(y, prob, corte) {
+  pred <- ifelse(prob >= corte, 1L, 0L)
+  vp <- sum(y == 1L & pred == 1L)
+  vn <- sum(y == 0L & pred == 0L)
+  fp <- sum(y == 0L & pred == 1L)
+  fn <- sum(y == 1L & pred == 0L)
+  data.frame(
+    Corte = corte,
+    Acuracia = (vp + vn) / length(y),
+    Sensibilidade = vp / (vp + fn),
+    Especificidade = vn / (vn + fp),
+    VPP = ifelse((vp + fp) > 0, vp / (vp + fp), NA_real_),
+    VPN = ifelse((vn + fn) > 0, vn / (vn + fn), NA_real_)
+  )
+}
+
+# Pontos da curva ROC e cálculo da AUC (regra dos trapézios)
+cortes_grid <- sort(unique(c(1.0001, prob_teste, 0)), decreasing = TRUE)
+df_roc <- do.call(
+  rbind,
+  lapply(cortes_grid, function(c) calc_metricas(y_teste, prob_teste, c))
+)
+df_roc$TFP <- 1 - df_roc$Especificidade
+
+ord_roc <- order(df_roc$TFP, df_roc$Sensibilidade)
+df_roc <- df_roc[ord_roc, ]
+auc_roc <- sum(
+  diff(df_roc$TFP) * (head(df_roc$Sensibilidade, -1) + tail(df_roc$Sensibilidade, -1)) / 2
+)
+
+# Ponto de corte ótimo pelo índice de Youden
+df_validos <- df_roc[df_roc$Corte <= 1 & df_roc$Corte >= 0, ]
+idx_youden <- which.max(df_validos$Sensibilidade + df_validos$Especificidade - 1)
+corte_youden <- df_validos$Corte[idx_youden]
+
+m_padrao <- calc_metricas(y_teste, prob_teste, 0.50)
+m_youden <- calc_metricas(y_teste, prob_teste, corte_youden)
+
+tabela_roc <- rbind(
+  cbind(Criterio = "Corte padrão (0,50)", m_padrao),
+  cbind(Criterio = sprintf("Ótimo de Youden (%.2f)", corte_youden), m_youden)
+)
+
+knitr::kable(
+  tabela_roc[, c("Criterio", "Acuracia", "Sensibilidade", "Especificidade", "VPP", "VPN")],
+  booktabs = TRUE,
+  row.names = FALSE,
+  digits = 3,
+  col.names = c(
+    "Critério de classificação", "Acurácia",
+    "Sensibilidade", "Especificidade", "VPP", "VPN"
+  ),
+  align = "lrrrrr"
+)
+```
+
+```{r}
+#| fig-cap: "Curva ROC do modelo logístico reduzido avaliada na amostra de teste (30%)"
+#| fig-width: 5.5
+#| fig-height: 4.8
+#| out-width: "75%"
+#| fig-align: "center"
+
+ponto_50 <- data.frame(
+  TFP = 1 - m_padrao$Especificidade,
+  Sensibilidade = m_padrao$Sensibilidade,
+  Label = "Corte 0,50 / Youden (0,51)"
+)
+
+ggplot(df_roc, aes(x = TFP, y = Sensibilidade)) +
+  geom_ribbon(aes(ymin = 0, ymax = Sensibilidade), fill = "#8FB8DE", alpha = 0.16) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey60", linewidth = 0.5) +
+  geom_step(color = "#1B365D", linewidth = 0.9) +
+  geom_point(
+    data = ponto_50,
+    aes(x = TFP, y = Sensibilidade, shape = Label),
+    color = "#B23A48", fill = "white", size = 3, stroke = 1.1
+  ) +
+  scale_shape_manual(values = 21) +
+  scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2), expand = c(0, 0)) +
+  coord_fixed(clip = "off") +
+  annotate(
+    "text", x = 0.96, y = 0.25, hjust = 1,
+    label = sub("\\.", ",", sprintf("AUC = %.3f", auc_roc)),
+    color = "#1B365D", fontface = "bold", size = 3.8
+  ) +
+  labs(x = "1 - Especificidade", y = "Sensibilidade", shape = NULL) +
+  theme_bw(base_size = 10.5) +
+  theme(
+    panel.grid = element_blank(),
+    panel.border = element_rect(color = "#1B365D", linewidth = 0.6),
+    axis.ticks = element_line(color = "#1B365D", linewidth = 0.5),
+    axis.text = element_text(color = "#1B365D"),
+    axis.title = element_text(color = "#1B365D"),
+    legend.position = c(0.97, 0.04),
+    legend.justification = c(1, 0),
+    legend.background = element_rect(fill = "white", color = "grey80", linewidth = 0.3),
+    legend.key = element_blank(),
+    legend.text = element_text(size = 8.5, color = "#1B365D"),
+    legend.margin = margin(3, 5, 3, 5)
+  )
+```
+
+A curva ROC na amostra de teste (Figura 9) distancia-se substancialmente da diagonal de classificação aleatória, atingindo área sob a curva ($\mathrm{AUC}$) de `r sprintf("%.3f", auc_roc)`, o que indica elevada capacidade discriminativa do modelo reduzido para distinguir pacientes com e sem diagnóstico positivo de doença arterial coronariana em observações não utilizadas no ajuste.
+
+Com o ponto de corte usual de $0{,}50$ (Tabela 16), o modelo alcançou acurácia global de `r sprintf("%.1f%%", 100 * m_padrao$Acuracia)`, com sensibilidade de `r sprintf("%.1f%%", 100 * m_padrao$Sensibilidade)` e especificidade de `r sprintf("%.1f%%", 100 * m_padrao$Especificidade)` (valor preditivo positivo de `r sprintf("%.1f%%", 100 * m_padrao$VPP)` e valor preditivo negativo de `r sprintf("%.1f%%", 100 * m_padrao$VPN)`). Ao adotar o limiar ótimo pelo critério de Youden, os valores de desempenham são os mesmos.
+
 ## Síntese dos critérios de comparação
 
 A Tabela 15 consolida a superioridade do modelo reduzido com ligação logit frente à especificação completa: a eliminação de cinco parâmetros proporcionou quedas de 5,66 pontos no AIC e de 24,12 pontos no BIC, mantendo 283 graus de liberdade residuais sem perda significativa de ajuste ($p = 0,5014$ no TRV). Aliada ao comportamento adequado dos resíduos dentro do envelope simulado de 95%, à boa calibração por quintis e à estabilidade dos sinais e magnitudes dos coeficientes na análise de sensibilidade, a especificação reduzida consolida-se como o modelo final adequado para descrever os fatores associados à doença arterial coronariana nesta amostra.
@@ -1298,17 +1440,16 @@ Terceiro, a transformação de `num` em uma resposta binária facilita o uso do 
 
 # Conclusão
 
-# Conclusão
-
 Neste trabalho, investigaram-se fatores clínicos e demográficos associados à presença de doença arterial coronariana na amostra de Cleveland do repositório UCI ($n = 297$), utilizando Modelos Lineares Generalizados com resposta binomial. Entre as especificações avaliadas, a função de ligação logit apresentou o melhor ajuste, com contribuição conjunta significativa das covariáveis em relação ao modelo nulo ($G^2 = 218{,}30$; $\text{gl} = 18$; $p < 0{,}0001$). A seleção *stepwise* bidirecional guiada pelo AIC reduziu o modelo de 19 para 14 parâmetros ($\mathrm{AIC} = 223{,}98$; $\mathrm{BIC} = 275{,}70$) ao descartar `age`, `chol`, `fbs` e `restecg`, preservando a qualidade de ajuste da especificação completa ($G^2 = 4{,}34$; $\text{gl} = 5$; $p = 0{,}5014$).
 
 No modelo final ajustado, destacaram-se como principais fatores condicionalmente associados ao diagnóstico positivo o número de vasos principais comprometidos na fluoroscopia ($\mathrm{OR} = 3{,}45$ por vaso adicional), a apresentação clínica assintomática em comparação à angina típica ($\mathrm{OR} = 8{,}79$), o sexo masculino ($\mathrm{OR} = 4{,}18$), a presença de defeito reversível na cintilografia de talassemia ($\mathrm{OR} = 3{,}91$), a inclinação plana do segmento ST ($\mathrm{OR} = 3{,}32$) e a pressão arterial em repouso ($\mathrm{OR} = 1{,}023$ por mmHg). Dada a natureza observacional do estudo e a amplitude dos intervalos de confiança em categorias com menor contagem amostral, essas estimativas expressam associações condicionais na amostra analisada, e não relações causais.
 
 A avaliação diagnóstica respaldou a adequação da especificação escolhida: os componentes do desvio padronizado permaneceram no interior do envelope simulado de 95%, as probabilidades previstas apresentaram boa calibração ao longo dos quintis de risco e a exclusão das observações mais influentes segundo a distância de Cook não alterou os sinais nem a interpretação dos preditores relevantes. Adicionalmente, as análises de sensibilidade confirmaram a adequação da forma funcional linear para as variáveis fisiológicas contínuas (`trestbps`, `thalach` e `oldpeak` avaliadas via *splines* naturais, $p = 0{,}789$) e apontaram um comportamento não linear para a contagem de vasos ca ($p = 0{,}0162$), embora sua codificação como fator não altere os sinais nem as conclusões sobre os demais preditores."
 
-Como desdobramentos futuros, recomenda-se avaliar codificações agrupadas ou dicotômicas para `ca` em coortes clínicas mais amplas, explorar modelos ordinais ou multinomiais que preservem os diferentes graus de gravidade diagnóstica registrados na variável original `num` e realizar validação preditiva em amostras independentes para verificar a capacidade de generalização dos resultados.
+Como desdobramentos futuros, recomenda-se avaliar codificações agrupadas ou dicotômicas para `ca` em coortes clínicas mais amplas e explorar modelos ordinais ou multinomiais que preservem os diferentes graus de gravidade diagnóstica registrados na variável original `num`.
 
 # Referências bibliográficas {.unnumbered}
 
 ::: {#refs}
 :::
+
