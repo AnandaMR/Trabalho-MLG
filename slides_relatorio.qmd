@@ -1,0 +1,704 @@
+---
+title: ""
+subtitle: ""
+author: ""
+date: ""
+section-titles: false
+format:
+  beamer:
+    pdf-engine: xelatex
+    aspectratio: 169
+    slide-number: true
+    keep-tex: true
+    slide-level: 2
+
+header-includes:
+  - |
+    \usepackage{fontspec}
+    \usepackage{amsmath,amssymb,mathtools}
+    \usepackage{booktabs}
+    \usepackage{tikz}
+    \usepackage[skins,breakable]{tcolorbox}
+    \usetikzlibrary{arrows.meta,positioning,shapes,fit,shapes.misc}
+    
+    % ------------------------------------------------
+    % PALETA DE CORES CLÍNICA (AZUL ARDÓSIA & VERMELHO)
+    % ------------------------------------------------
+    \definecolor{darkblue}{HTML}{2C4B4E}    % Azul ardósia profundo (títulos e estrutura)
+    \definecolor{lightblue}{HTML}{4A777A}   % Azul petróleo do relatório (linhas e marcadores)
+    \definecolor{accentblue}{HTML}{EBF2F2}  % Azul gelo ultra-claro para destaque (bluebox)
+    \definecolor{boxgray}{HTML}{F2F4F4}     % Cinza claro neutro técnico (graybox)
+    \definecolor{borderblue}{HTML}{9BB7B9}  % Borda azul suave
+    \definecolor{bordergray}{HTML}{C4CECE}  % Borda cinza suave
+    \definecolor{clinicalred}{HTML}{B22222} % Vermelho clínico para alertas e destaques
+    \definecolor{textgray}{HTML}{1E2627}    % Texto escuro de alto contraste
+
+    % Cores complementares para caixas numéricas
+    \setbeamercolor{structure}{fg=darkblue}
+    \setbeamercolor{frametitle}{fg=white,bg=darkblue}
+    \setbeamercolor{title}{fg=white}
+    \setbeamercolor{normal text}{fg=darkblue,bg=white}
+    \setbeamertemplate{navigation symbols}{}
+    \setbeamertemplate{footline}[frame number]
+    \setbeamertemplate{itemize item}{\color{clinicalred}\small$\blacktriangleright$}
+    \setbeamertemplate{itemize subitem}{\color{darkblue}\tiny$\bullet$}
+    \newcommand{\keynumber}[2]{\begin{center}{\color{clinicalred}\fontsize{27}{30}\selectfont\bfseries #1}\\[-2pt]{\small #2}\end{center}}
+
+    % ------------------------------------------------
+    % FONTE
+    % ------------------------------------------------
+    \IfFontExistsTF{Segoe UI}{
+      \setsansfont{Segoe UI}
+    }{
+      \setsansfont{Arial}
+    }
+
+    % ------------------------------------------------
+    % ESTILO GERAL BEAMER
+    % ------------------------------------------------
+    \usetheme{default}
+
+    \setbeamertemplate{navigation symbols}{}
+    \setbeamertemplate{footline}{
+      \hfill
+      \usebeamerfont{page number in head/foot}
+      \usebeamercolor[fg]{page number in head/foot}
+      \insertframenumber{} / \inserttotalframenumber
+      \hspace{0.35cm}
+      \vspace{0.15cm}
+    }
+
+    \setbeamercolor{normal text}{fg=textgray}
+    \setbeamercolor{frametitle}{fg=darkblue}
+    \setbeamercolor{structure}{fg=darkblue}
+
+    \setbeamerfont{frametitle}{size=\large,series=\bfseries}
+    \setbeamerfont{framesubtitle}{size=\small}
+
+    % ------------------------------------------------
+    % DESIGN DO TÍTULO DOS SLIDES
+    % ------------------------------------------------
+    \setbeamertemplate{frametitle}{
+      \vspace{0.15cm}
+      \insertframetitle
+      \par
+      \vspace{0.05cm}
+      {\color{lightblue}\rule{\textwidth}{1.2pt}}
+      \vspace{0.08cm}
+    }
+
+    % ------------------------------------------------
+    % DEFINIÇÃO DAS CAIXAS (bluebox e graybox)
+    % ------------------------------------------------
+    \newenvironment{bluebox}{
+      \begin{tcolorbox}[
+        colback=accentblue,
+        colframe=borderblue,
+        boxrule=0.8pt,
+        arc=3pt,
+        left=6pt,right=6pt,top=6pt,bottom=6pt,
+        width=\textwidth
+      ]
+    }{
+      \end{tcolorbox}
+    }
+
+    \newenvironment{graybox}{
+      \begin{tcolorbox}[
+        colback=boxgray,
+        colframe=bordergray,
+        boxrule=0.8pt,
+        arc=3pt,
+        left=6pt,right=6pt,top=6pt,bottom=6pt,
+        width=\textwidth
+      ]
+    }{
+      \end{tcolorbox}
+    }
+
+    % ------------------------------------------------
+    % ITEMIZE
+    % ------------------------------------------------
+    \setbeamertemplate{itemize item}{
+      \color{lightblue}\small$\bullet$
+    }
+
+    \setbeamertemplate{itemize subitem}{
+      \color{clinicalred}\scriptsize$\bullet$
+    }
+
+    \setlength{\leftmargini}{0.5cm}
+    \setlength{\leftmarginii}{0.4cm}
+
+    % ------------------------------------------------
+    % MATEMÁTICA
+    % ------------------------------------------------
+    \setlength{\abovedisplayskip}{6pt}
+    \setlength{\belowdisplayskip}{6pt}
+
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+## {.plain}
+
+\begin{tikzpicture}[remember picture, overlay]
+  % Faixa decorativa inferior em ondas suaves
+  \fill[darkblue] (current page.south west) rectangle ([yshift=1.1cm]current page.south east);
+  \fill[lightblue, opacity=0.85] ([yshift=1.1cm]current page.south west) -- ([yshift=1.45cm]current page.south east) -- ([yshift=1.1cm]current page.south east) -- cycle;
+  
+  % Linha de ECG (parte esquerda)
+  \draw[clinicalred, line width=1.5pt, line cap=round, line join=round] 
+    ([xshift=-2.6cm, yshift=-1.4cm]current page.north) -- 
+    ([xshift=-1.6cm, yshift=-1.4cm]current page.north) -- 
+    ([xshift=-1.3cm, yshift=-1.0cm]current page.north) -- 
+    ([xshift=-1.0cm, yshift=-1.8cm]current page.north) -- 
+    ([xshift=-0.7cm, yshift=-1.2cm]current page.north);
+    
+  % Coração desenhado nativamente com curvas de Bézier (sem pacotes extras)
+  \begin{scope}[shift={([yshift=-1.48cm]current page.north)}, scale=0.22]
+    \fill[clinicalred] (0,-0.8) 
+      .. controls (-1.2,0.1) and (-1.6,1.1) .. (-0.8,1.5)
+      .. controls (-0.3,1.7) and (0,1.3) .. (0,1.0)
+      .. controls (0,1.3) and (0.3,1.7) .. (0.8,1.5)
+      .. controls (1.6,1.1) and (1.2,0.1) .. (0,-0.8) -- cycle;
+  \end{scope}
+
+  % Linha de ECG (parte direita)
+  \draw[clinicalred, line width=1.5pt, line cap=round, line join=round] 
+    ([xshift=0.7cm, yshift=-1.2cm]current page.north) -- 
+    ([xshift=1.0cm, yshift=-1.8cm]current page.north) -- 
+    ([xshift=1.3cm, yshift=-1.0cm]current page.north) -- 
+    ([xshift=1.6cm, yshift=-1.4cm]current page.north) -- 
+    ([xshift=2.6cm, yshift=-1.4cm]current page.north);
+\end{tikzpicture}
+
+\vspace{0.6cm}
+\begin{center}
+  {\LARGE \color{darkblue}\textbf{Modelagem Estatística de Dados Clínicos}}\\
+  \vspace{0.12cm}
+  {\LARGE \color{darkblue}\textbf{via Modelos Lineares Generalizados}}\\
+  \vspace{0.25cm}
+  {\large \color{lightblue}Análise exploratória, seleção e diagnóstico aplicados à base de}\\
+  {\large \color{lightblue}doenças cardíacas de Cleveland (UCI)}
+\end{center}
+
+\vspace{0.9cm}
+
+\begin{center}
+  {\normalsize \color{textgray}\textbf{Ananda Rivas e Isabelle Sannier}}\\
+  \vspace{0.1cm}
+  {\small \color{lightblue}15 de novembro de 2026}
+\end{center}
+
+
+## Roteiro da Apresentação
+
+\tableofcontents
+
+```{r}
+#| include: false
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(tibble)
+
+darkblue <- "#2C4B4E"
+lightblue <- "#4A777A"
+clinicalred <- "#B22222"
+
+# 1. Perfil da amostra
+perfil <- data.frame(
+  Diagnostico = factor(
+    c("Sem doença (0)", "Com doença (1)"),
+    levels = c("Sem doença (0)", "Com doença (1)")
+  ),
+  Frequencia = c(160, 137)
+)
+
+p_perfil <- ggplot(perfil, aes(Diagnostico, Frequencia, fill = Diagnostico)) +
+  geom_col(width = 0.58) +
+  geom_text(
+    aes(label = sprintf("%d (%.1f%%)", Frequencia, Frequencia / 297 * 100)),
+    vjust = -0.45, size = 4.2, fontface = "bold", color = darkblue
+  ) +
+  scale_fill_manual(values = c(lightblue, clinicalred)) +
+  scale_y_continuous(limits = c(0, 190), expand = expansion(mult = c(0, 0.02))) +
+  labs(x = NULL, y = "Número de participantes") +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(color = darkblue),
+    axis.title.y = element_text(color = darkblue)
+  )
+
+# 2. Comparação das funções de ligação
+link_data <- tibble(
+  ligacao = c("Logit", "Probit", "Complementar log-log"),
+  AIC = c(229.64, 230.90, 236.06),
+  destaque = c("Menor AIC", "Outra ligação", "Outra ligação")
+) |>
+  mutate(ligacao = factor(ligacao, levels = rev(ligacao)))
+
+p_link <- ggplot(link_data, aes(AIC, ligacao, fill = destaque)) +
+  geom_col(width = 0.58) +
+  geom_text(
+    aes(label = sprintf("%.2f", AIC)),
+    hjust = -0.18, size = 4, color = darkblue, fontface = "bold"
+  ) +
+  scale_fill_manual(values = c("Menor AIC" = clinicalred,
+                               "Outra ligação" = lightblue)) +
+  scale_x_continuous(
+    limits = c(0, 268),
+    expand = expansion(mult = c(0, 0.02))
+  ) +
+  labs(x = "AIC (menor valor indica melhor ajuste penalizado)", y = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text = element_text(color = darkblue)
+  )
+
+# 3. Forest plot: OR e IC de 95%
+or_data <- tibble(
+  termo = c(
+    "Dor torácica: assintomática",
+    "Sexo: masculino",
+    "Talassemia: defeito reversível",
+    "Número de vasos (por vaso)",
+    "Inclinação ST: plana",
+    "Pressão arterial (por mmHg)"
+  ),
+  OR = c(8.791, 4.180, 3.908, 3.445, 3.322, 1.023),
+  inferior = c(2.544, 1.633, 1.751, 2.137, 1.353, 1.003),
+  superior = c(34.195, 11.464, 8.944, 5.874, 8.446, 1.045)
+) |>
+  mutate(termo = factor(termo, levels = rev(termo)))
+
+p_or <- ggplot(or_data, aes(OR, termo)) +
+  geom_vline(xintercept = 1, linetype = 2, color = "grey45") +
+  geom_errorbar(
+    aes(xmin = inferior, xmax = superior),
+    orientation = "y", width = 0.2, linewidth = 0.8, color = darkblue
+  ) +
+  geom_point(size = 3, color = clinicalred) +
+  scale_x_log10(
+    breaks = c(1, 2, 4, 8, 16, 32),
+    labels = label_number()
+  ) +
+  labs(x = "Odds Ratio (escala logarítmica) e IC de 95%", y = NULL) +
+  theme_minimal(base_size = 10.5) +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.text = element_text(color = darkblue),
+    plot.margin = margin(5, 12, 5, 5)
+  )
+
+# 4. Análise de sensibilidade: coeficientes antes/depois
+sens_data <- tibble(
+  variavel = c(
+    "Dor assintomática", "Dor assintomática",
+    "Dor atípica", "Dor atípica",
+    "Sexo masculino", "Sexo masculino",
+    "Número de vasos (ca)", "Número de vasos (ca)",
+    "Dor não anginosa", "Dor não anginosa"
+  ),
+  modelo = rep(c("Original (n = 297)", "Sem 3 observações (n = 294)"), 5),
+  coeficiente = c(2.174, 2.544, 1.292, 1.717, 1.430, 1.455,
+                  1.237, 1.504, 0.203, 0.474)
+) |>
+  mutate(variavel = factor(
+    variavel,
+    levels = rev(c("Dor assintomática", "Dor atípica", "Sexo masculino",
+                   "Número de vasos (ca)", "Dor não anginosa"))
+  ))
+
+p_sens <- ggplot(
+  sens_data,
+  aes(coeficiente, variavel, color = modelo, shape = modelo)
+) +
+  geom_vline(xintercept = 0, linetype = 2, color = "grey50") +
+  geom_point(size = 3.1, position = position_dodge(width = 0.45)) +
+  scale_color_manual(values = c(
+    "Original (n = 297)" = darkblue,
+    "Sem 3 observações (n = 294)" = clinicalred
+  )) +
+  labs(
+    x = "Estimativa do coeficiente (escala logit)",
+    y = NULL, color = NULL, shape = NULL
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    legend.position = "top",
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.text = element_text(color = darkblue)
+  )
+```
+
+# Contexto e dados
+
+## A pergunta que guia o estudo
+
+\begin{center}
+\vspace{0.2cm}
+{\Large\color{darkblue}\textbf{Como características clínicas e demográficas se associam à presença de doença cardíaca?}}
+\vspace{0.5cm}
+
+\begin{tikzpicture}[
+  node distance=0.8cm,
+  every node/.style={
+    rounded corners, align=center, minimum height=0.9cm,
+    text width=2.7cm, font=\small
+  }
+]
+\node[fill=accentblue, draw=darkblue, thick] (dados)
+  {\textbf{1. Dados clínicos}\\Amostra de Cleveland};
+\node[fill=accentblue, draw=darkblue, thick, right=of dados] (modelo)
+  {\textbf{2. Modelo estatístico}\\Ajuste simultâneo};
+\node[fill=accentblue, draw=darkblue, thick, right=of modelo] (resultado)
+  {\textbf{3. Evidências}\\Associações e limites};
+\draw[-{Stealth}, very thick, clinicalred] (dados) -- (modelo);
+\draw[-{Stealth}, very thick, clinicalred] (modelo) -- (resultado);
+\end{tikzpicture}
+\vspace{0.4cm}
+\end{center}
+
+\begin{graybox}
+\centering
+\textbf{Foco do estudo:} compreender padrões de associação ajustada nos dados observados. Não buscamos diagnosticar pacientes individualmente nem demonstrar causalidade.
+\end{graybox}
+
+## De onde vieram os dados?
+
+::: columns
+::: {.column width="33%"}
+\keynumber{303}{registros iniciais}
+:::
+::: {.column width="33%"}
+\keynumber{6}{casos excluídos}
+:::
+::: {.column width="33%"}
+\keynumber{297}{casos analisados}
+:::
+:::
+
+- Fonte: base *Heart Disease*, repositório UCI, amostra de Cleveland.
+- O conjunto contém 14 variáveis, incluindo características demográficas e clínicas.
+- Foram utilizados casos completos para que os modelos fossem comparados sobre a mesma amostra.
+
+\begin{graybox}
+A exclusão dos seis registros ocorreu devido à presença de valores ausentes nas variáveis utilizadas.
+\end{graybox}
+
+## Por que utilizar um MLG?
+
+- A variável resposta é binária: presença ou ausência de doença.
+- O modelo binomial permite modelar probabilidades entre 0 e 1.
+- O efeito de cada variável é estimado considerando simultaneamente as demais covariáveis.
+
+\begin{bluebox}
+O objetivo é estimar associações ajustadas, e não estabelecer relações de causa e efeito.
+\end{bluebox}
+
+# Análise exploratória
+
+## Perfil da amostra
+\vspace{-0.5cm}
+::: columns
+::: {.column width="42%"}
+\begin{bluebox}
+\textbf{Amostra analisada}
+
+- 297 participantes
+
+- 160 sem doença (53,9\%)
+
+- 137 com doença (46,1\%)
+
+- 6 registros excluídos por dados ausentes
+\end{bluebox}
+
+A variável original `num` foi recodificada em duas categorias:
+$$
+\texttt{doenca}=0 \text{ se } \texttt{num}=0
+$$
+$$
+\texttt{doenca}=1 \text{ se } \texttt{num}>0
+$$
+:::
+::: {.column width="58%"}
+```{r}
+#| fig-width: 6
+#| fig-height: 3.6
+#| out-width: 100%
+p_perfil
+```
+:::
+:::
+
+## Pistas iniciais: diferenças entre os grupos
+
+\begin{itemize}
+\item A idade média foi maior no grupo com doença (56,8 contra 52,6 anos).
+\item O grupo com doença apresentou menor frequência cardíaca máxima (`thalach`) e maior depressão do segmento ST (`oldpeak`).
+\item As categorias de dor torácica assintomática e talassemia reversível apareceram associadas a maior proporção de diagnósticos positivos.
+\end{itemize}
+
+\begin{graybox}
+Essas observações são descritivas. A avaliação conjunta das associações é realizada posteriormente pelo modelo.
+\end{graybox}
+
+## Correlações entre variáveis quantitativas
+
+| Par de variáveis | Correlação de Spearman |
+|:--|--:|
+| `thalach` × `oldpeak` | -0,44 |
+| Idade × `thalach` | -0,39 |
+| Idade × `ca` | 0,38 |
+| Idade × `trestbps` | 0,30 |
+
+\begin{bluebox}
+As associações observadas são moderadas. A matriz de correlação, isoladamente, não permite concluir que exista ou não multicolinearidade severa no modelo; essa avaliação exige diagnóstico conjunto.
+\end{bluebox}
+
+# Modelagem e seleção
+
+## Especificação do MLG
+
+Para cada indivíduo, considera-se:
+$$
+Y_i \sim \operatorname{Bernoulli}(\pi_i)
+$$
+
+No modelo logit:
+$$
+\log\left(\frac{\pi_i}{1-\pi_i}\right)
+=
+\beta_0+\beta_1x_{i1}+\cdots+\beta_px_{ip}
+$$
+
+- $Y_i$: indicador de presença de doença.
+- $\pi_i$: probabilidade de diagnóstico positivo.
+- $\beta_j$: efeito associado à variável explicativa $j$, mantendo as demais constantes.
+
+## Comparação entre funções de ligação
+
+::: columns
+::: {.column width="55%"}
+```{r}
+#| fig-width: 5.8
+#| fig-height: 3.4
+#| out-width: 100%
+p_link
+```
+:::
+::: {.column width="45%"}
+Foram ajustados modelos binomiais com três funções de ligação:
+
+- Logit: AIC = 229,64
+- Probit: AIC = 230,90
+- Complementar log-log: AIC = 236,06
+
+\begin{bluebox}
+O modelo logit apresentou o menor AIC entre as especificações comparadas.
+\end{bluebox}
+:::
+:::
+
+## Avaliação global do modelo completo
+
+| Medida | Resultado |
+|:--|--:|
+| Deviance nula | 409,95 |
+| Deviance residual | 191,64 |
+| Estatística da razão de verossimilhanças | 218,30 |
+| Graus de liberdade | 18 |
+| Valor-p | < 0,0001 |
+
+\begin{bluebox}
+O teste da razão de verossimilhanças indica melhora estatisticamente significativa em relação ao modelo nulo. O conjunto de variáveis contribui para explicar o desfecho.
+\end{bluebox}
+
+## Do modelo completo ao modelo reduzido
+\vspace{-0.5cm}
+A seleção stepwise baseada no AIC removeu quatro variáveis:
+
+- Removidas: `age`, `chol`, `fbs` e `restecg`.
+- Mantidas: `sex`, `cp`, `trestbps`, `thalach`, `exang`, `oldpeak`, `slope`, `ca` e `thal`.
+
+::: columns
+::: {.column width="45%"}
+| Critério | Completo | Reduzido |
+|:--|--:|--:|
+| Deviance residual | 191,64 | 195,98 |
+| AIC | 229,64 | **223,98** |
+| BIC | 299,82 | **275,70** |
+:::
+::: {.column width="55%"}
+\begin{bluebox}
+\textbf{Comparação por razão de verossimilhanças}
+
+$$
+\Delta D=4,34
+$$
+$$
+GL=5,\quad p=0,5014
+$$
+
+Não foi detectada perda estatisticamente significativa de ajuste ao utilizar o modelo reduzido.
+\end{bluebox}
+:::
+:::
+
+# Resultados e interpretação
+
+## Associações estimadas: Odds Ratios
+
+```{r}
+#| fig-width: 8.5
+#| fig-height: 4.2
+#| out-width: 100%
+p_or
+```
+
+\begin{center}
+{\small\color{darkblue}Os seis efeitos apresentados têm valor-p inferior a 0,05 e IC de 95\% inteiramente acima de 1.}
+\end{center}
+
+## Como interpretar as razões de chances?
+
+::: columns
+::: {.column width="50%"}
+\keynumber{4,18}{OR para sexo masculino}
+
+\begin{graybox}
+Mantendo as demais variáveis constantes, as chances estimadas de doença foram 4,18 vezes as do grupo feminino.
+\end{graybox}
+:::
+::: {.column width="50%"}
+\keynumber{3,45}{OR por vaso adicional (`ca`)}
+
+\begin{graybox}
+Cada vaso adicional está associado a chances estimadas 3,45 vezes maiores, sob a hipótese de efeito linear no logit.
+\end{graybox}
+:::
+:::
+
+\begin{bluebox}
+\textbf{Cuidado:} Odds Ratio não é risco relativo nem aumento direto da probabilidade. Associação ajustada também não implica causalidade.
+\end{bluebox}
+
+## Resultados sem significância a 5\%
+
+| Variável | Valor-p |
+|:--|--:|
+| Dor torácica atípica | 0,088 |
+| Frequência cardíaca máxima (`thalach`) | 0,139 |
+| Angina induzida por exercício (`exang`) | 0,122 |
+| Depressão ST (`oldpeak`) | 0,077 |
+| Inclinação descendente (`slope`) | 0,614 |
+
+\begin{graybox}
+Uma variável pode permanecer no modelo reduzido mesmo sem apresentar significância individual a 5\%. A seleção por AIC e o teste individual de coeficientes respondem a critérios diferentes.
+\end{graybox}
+
+# Diagnóstico e limitações
+
+## Resíduos e envelope simulado
+
+- Os resíduos de deviance aparecem em duas faixas, comportamento esperado para uma resposta binária.
+- No envelope half-normal, a maior parte dos pontos permaneceu dentro da banda simulada de 95\%.
+- Não foram observados desvios visuais acentuados que, isoladamente, indiquem falta de ajuste severa.
+
+\begin{bluebox}
+O diagnóstico deve ser interpretado em conjunto com as medidas de alavancagem e influência. A presença de alguns resíduos mais afastados não demonstra, por si só, especificação incorreta.
+\end{bluebox}
+
+## Existem observações potencialmente influentes?
+
+Foram investigadas observações com distância de Cook acima da referência $4/n=0,0135$.
+
+| Observação | Distância de Cook | Alavancagem |
+|--:|--:|--:|
+| 182 | 0,0686 | 0,2004 |
+| 197 | 0,0486 | 0,0524 |
+| 92 | 0,0482 | 0,0157 |
+| 17 | 0,0453 | 0,1953 |
+| 175 | 0,0434 | 0,0212 |
+| 268 | 0,0283 | 0,2068 |
+
+\begin{graybox}
+Esses casos foram examinados como observações potencialmente influentes, sem exclusão automática.
+\end{graybox}
+
+## Análise de sensibilidade
+\vspace{-0.5cm}
+O modelo foi reestimado após a remoção das três observações com maiores distâncias de Cook: 182, 197 e 92.
+
+::: columns
+::: {.column width="57%"}
+```{r}
+#| fig-width: 5.8
+#| fig-height: 3.4
+#| out-width: 100%
+p_sens
+```
+:::
+::: {.column width="43%"}
+\begin{bluebox}
+\textbf{Principais observações}
+
+- Não houve inversão de sinal dos coeficientes.
+
+- O coeficiente de sexo masculino mudou pouco.
+
+- Algumas estimativas, como dor não anginosa e inclinação descendente, apresentaram mudanças maiores.
+
+\end{bluebox}
+:::
+:::
+
+## Limitações do estudo
+
+- **Amostra:** os dados são da população clínica de Cleveland; a generalização deve ser cautelosa.
+- **Dados ausentes:** a análise de casos completos excluiu seis observações.
+- **Dicotomização:** a recodificação de `num` elimina informação sobre os níveis originais de gravidade.
+- **Seleção stepwise:** pode produzir estimativas e valores-p otimistas.
+- **Variável `ca`:** foi tratada como numérica, assumindo efeito linear no logit por vaso adicional.
+
+# Considerações finais
+
+## Três mensagens para levar
+
+\begin{enumerate}
+\item Entre as funções de ligação avaliadas, o \textbf{logit} apresentou o menor AIC.
+\item O \textbf{modelo reduzido} apresentou menores AIC e BIC, sem evidência de perda significativa de ajuste no teste de razão de verossimilhanças.
+\item Características clínicas como tipo de dor torácica, número de vasos e talassemia apresentaram associações ajustadas relevantes com o desfecho.
+\end{enumerate}
+
+\begin{bluebox}
+\centering
+\textbf{Os MLG oferecem uma estrutura útil para estudar associações clínicas, desde que seus resultados sejam interpretados considerando as hipóteses, a amostra e as limitações do estudo.}
+\end{bluebox}
+
+## Referências
+
+Janosi, A., Steinbrunn, W., Pfisterer, M., \& Detrano, R. (1989). *Heart Disease* [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C52P4X.
+
+## {.plain}
+
+\begin{center}
+\vspace{1.5cm}
+{\Huge\color{darkblue}\textbf{Obrigada pela atenção!}}
+
+\vspace{0.5cm}
+{\Large\color{lightblue}Perguntas e discussão}
+\end{center}
