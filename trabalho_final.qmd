@@ -61,12 +61,6 @@ execute:
   message: false
 ---
 
-```{r}
-library(tidyverse)
-library(GGally)
-library(splines)
-```
-
 ```{=latex}
 \begin{titlepage}
   \thispagestyle{empty}
@@ -106,6 +100,12 @@ library(splines)
 \setcounter{tocdepth}{3}
 \tableofcontents
 \clearpage
+```
+
+```{r}
+library(tidyverse)
+library(GGally)
+library(splines)
 ```
 
 # Introdução
@@ -804,7 +804,7 @@ knitr::kable(
 )
 ```
 
-O procedimento *stepwise* bidirecional eliminou quatro variáveis (`age`, `chol`, `fbs` e `restecg`), reduzindo a dimensão do modelo de 19 para 14 parâmetros (Tabelas 8 e 9). Essa simplificação elevou a deviance residual em apenas 4,34 unidades, mas proporcionou ganho expressivo nos critérios penalizados: o AIC recuou 5,66 pontos e o BIC diminuiu 24,12 pontos. A exclusão de `age` é coerente com a análise exploratória (Figura 4), uma vez que seu efeito marginal estava parcialmente compartilhado com `ca` ($r_s = 0,382$), `thalach` ($r_s = -0,393$) e `trestbps` ($r_s = 0,300$), que permaneceram na especificação reduzida.
+O procedimento *stepwise* bidirecional eliminou quatro variáveis (`age`, `chol`, `fbs` e `restecg`), reduzindo a dimensão do modelo de 19 para 14 parâmetros (Tabelas 8 e 9). Essa simplificação elevou a deviance residual em apenas 4,34 unidades, mas proporcionou ganho expressivo nos critérios penalizados. A exclusão de `age` é coerente com a análise exploratória (Figura 4), uma vez que seu efeito marginal estava parcialmente compartilhado com `ca` ($r_s = 0,382$), `thalach` ($r_s = -0,393$) e `trestbps` ($r_s = 0,300$), que permaneceram na especificação reduzida.
 
 ### Comparação dos modelos encaixados
 
@@ -893,7 +893,7 @@ knitr::kable(
   booktabs = TRUE,
   row.names = FALSE,
   col.names = c(
-    "Termo", "OR", "IC 95% (Inferior)", "IC 95% (Superior)", "Valor-p"
+    "Parâmetro", "OR", "IC 95% (Inferior)", "IC 95% (Superior)", "Valor-p"
   ),
   align = "lrrrr"
 )

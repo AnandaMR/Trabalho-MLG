@@ -704,6 +704,46 @@ desc_cat <- ggplot(dados_cat_long, aes(x = Categoria, fill = diagnostico)) +
   theme(
     legend.position = "bottom")
 
+# coeficientes da odds-ratio
+
+coeficientes <- summary(mod_reduzido)$coefficients
+ic_coef <- suppressMessages(confint(mod_reduzido))
+
+tabela_or <- data.frame(
+  Termo = names(coef(mod_reduzido)),
+  OR = exp(coef(mod_reduzido)),
+  IC95_inferior = exp(ic_coef[, 1]),
+  IC95_superior = exp(ic_coef[, 2]),
+  Valor_p = coeficientes[, 4],
+  row.names = NULL
+)
+
+fmt_num <- function(x) {
+  ifelse(x < 0.001, "< 0,001", sprintf("%.3f", x))
+}
+
+tabela_or_fmt <- data.frame(
+  Termo = tabela_or$Termo,
+  OR = fmt_num(tabela_or$OR),
+  IC95_inferior = fmt_num(tabela_or$IC95_inferior),
+  IC95_superior = fmt_num(tabela_or$IC95_superior),
+  Valor_p = ifelse(
+    tabela_or$Valor_p < 0.0001,
+    "< 0,0001",
+    sprintf("%.4f", tabela_or$Valor_p)
+  )
+)
+
+tab_coef_odd <- knitr::kable(
+  tabela_or_fmt,
+  booktabs = TRUE,
+  row.names = FALSE,
+  col.names = c(
+    "Parâmetro", "OR", "IC 95% (Inferior)", "IC 95% (Superior)", "Valor-p"
+  ),
+  align = "lrrrr"
+)
+
 ```
 
 # Contexto e dados
@@ -946,6 +986,14 @@ A eliminação de 5 parâmetros preserva a qualidade de ajuste do modelo complet
 
 ## Associações estimadas: Odds Ratios
 
+\scriptsize
+```{r}
+tab_coef_odd
+```
+\LARGE
+
+## Associações estimadas: Odds Ratios
+
 ```{r}
 #| fig-width: 8.5
 #| fig-height: 3.65
@@ -953,58 +1001,13 @@ A eliminação de 5 parâmetros preserva a qualidade de ajuste do modelo complet
 p_or
 ```
 
-\begin{center}
-{\small\color{darkblue}Os seis efeitos apresentados têm valor-p inferior a 0,05 e IC de 95\% inteiramente acima de 1.}
-\end{center}
-
-## Como interpretar as razões de chances?
-
-::: columns
-::: {.column width="50%"}
-\keynumber{4,18}{OR para sexo masculino}
-
-\begin{graybox}
-Mantendo as demais variáveis constantes, as chances estimadas de doença entre homens foram 4,18 vezes as das mulheres (IC 95\%: 1,63 a 11,46).
-\end{graybox}
-:::
-::: {.column width="50%"}
-\keynumber{3,45}{OR por vaso adicional (`ca`)}
-
-\begin{graybox}
-Cada vaso adicional na fluoroscopia multiplica as chances estimadas por 3,45 (IC 95\%: 2,14 a 5,87; $p < 0{,}0001$).
-\end{graybox}
-:::
-:::
-
-\begin{bluebox}
-\textbf{Cuidado:} Odds Ratio não é risco relativo nem aumento direto da probabilidade. Associação ajustada também não implica causalidade.
-\end{bluebox}
-
-## Resultados sem significância a 5\%
-
-| Variável | OR | Valor-p |
-|:--|--:|--:|
-| Dor torácica atípica | 3,638 | 0,0881 |
-| Depressão ST (`oldpeak`) | 1,481 | 0,0775 |
-| Angina induzida por exercício (`exang`) | 1,953 | 0,1218 |
-| Frequência cardíaca máxima (`thalach`) | 0,985 | 0,1391 |
-| Inclinação descendente (`slope`) | 1,570 | 0,6138 |
-
-\begin{graybox}
-Essas covariáveis exibem sinais clinicamente coerentes e contribuem para a redução do AIC global, embora seus intervalos de confiança de 95\% englobem a unidade.
-\end{graybox}
-
 # Diagnóstico, validação e limitações
 
 ## Resíduos e envelope simulado
 
 - No gráfico normal de probabilidades com **envelope simulado de 95%** (1.000 réplicas), a quase totalidade dos resíduos de deviance padronizados permaneceu dentro da banda esperada.
-- Apenas pontos isolados tangenciaram as bordas nas caudas (percentis $-2{,}5$ a $-2{,}0$ e $2{,}0$), compatível com flutuação amostral.
-- Os resíduos de deviance vs. valores ajustados concentraram-se em $[-2, 2]$, sem curvaturas sistemáticas.
+- Os resíduos de deviance vs. valores ajustados concentraram-se em $[-2, 2]$.
 
-\begin{bluebox}
-O diagnóstico residual confirma a adequação da função de ligação logit e da estrutura de variância binomial do modelo reduzido.
-\end{bluebox}
 
 ## Envelope simulado
 
@@ -1021,33 +1024,15 @@ envelope
 ## Resíduos de deviance vs. valores ajustados
 
 ```{r}
-#| fig-cap: "Resíduos de deviance versus valores ajustados"
 #| fig-width: 6
 #| fig-height: 3.6
 #| out-width: "60%"
 #| fig-align: "center"
 
 residuo_deviance_ajustado
-
 ```
 
-
-## Alavancagem e distância de Cook
-
-Foram inspecionadas as observações com distância de Cook acima da referência $4/n = 0{,}0135$:
-
-| Observação | Distância de Cook | Alavancagem |
-|--:|--:|--:|
-| 182 | 0,0686 | 0,2004 |
-| 197 | 0,0486 | 0,0524 |
-| 92 | 0,0482 | 0,0157 |
-| 17 | 0,0453 | 0,1953 |
-| 175 | 0,0434 | 0,0212 |
-| 268 | 0,0283 | 0,2068 |
-
-\begin{graybox}
-Esses casos foram examinados como observações potencialmente influentes, sem exclusão automática. 
-\end{graybox}
+$$d_i = \operatorname{sinal}(y_i - \hat{\pi}_i)\sqrt{-2\left[y_i \log(\hat{\pi}_i) + (1 - y_i)\log(1 - \hat{\pi}_i)\right]}$$
 
 ## Calibração descritiva por quintis
 \vspace{-0.4cm}
@@ -1063,9 +1048,6 @@ Comparação entre probabilidades médias estimadas e proporções observadas em
 | 4 | 0,8814 | 0,8046 |
 | 5 | 0,9500 | 0,9830 |
 
-\begin{bluebox}
-Boa aderência à diagonal em toda a escala de risco, discriminando eficazmente pacientes de baixo e alto risco.
-\end{bluebox}
 :::
 ::: {.column width="48%"}
 ```{r}
@@ -1076,6 +1058,20 @@ p_calib
 ```
 :::
 :::
+
+## Alavancagem e distância de Cook
+
+Foram inspecionadas as observações com distância de Cook acima da referência $4/n = 0{,}0135$:
+
+| Observação | Distância de Cook | Alavancagem |
+|--:|--:|--:|
+| 182 | 0,0686 | 0,2004 |
+| 197 | 0,0486 | 0,0524 |
+| 92 | 0,0482 | 0,0157 |
+| 17 | 0,0453 | 0,1953 |
+| 175 | 0,0434 | 0,0212 |
+| 268 | 0,0283 | 0,2068 |
+
 
 ## Sensibilidade a pontos influentes
 \vspace{-0.5cm}
@@ -1113,9 +1109,9 @@ p_sens
 
 \small
 \textbf{Contínuas lineares:} \textit{splines} naturais não melhoram o ajuste ($G^2 = 1{,}05$; $p = 0{,}789$), validando a forma linear.
-\textbf{Codificação de \texttt{ca}:} o formato categórico reduz o AIC ($p = 0{,}0162$; $\text{OR} = 8{,}69$ em 1 vaso), mas poucos negativos em \texttt{ca = 3} ($n = 3$) alargam os ICs e pioram o BIC; mantém-se o termo linear.
+\textbf{Codificação de \texttt{ca}:} o formato categórico reduz o AIC ($p = 0{,}0162$; $\text{OR} = 8{,}69$ em 1 vaso), mas poucos negativos em \texttt{ca = 3}.
 
-## Avaliação preditiva e curva ROC (70% treino / 30% teste)
+## Avaliação preditiva e curva ROC
 \vspace{-0.4cm}
 ::: columns
 ::: {.column width="50%"}
@@ -1130,9 +1126,13 @@ Partição estratificada em treino ($n = 208$) e teste ($n = 89$):
 | Valor preditivo positivo (VPP) | 86,8\% |
 | Valor preditivo negativo (VPN) | 84,3\% |
 
-\begin{bluebox}
-Elevada capacidade discriminativa fora da amostra de ajuste ($\mathrm{AUC} = 0{,}892$).
-\end{bluebox}
+\scriptsize
+- Sensibilidade: Taxa de Verdadeiros Positivos $\frac{\mathrm{VP}}{\mathrm{VP} + \mathrm{FN}}$
+- Especificidade: Taxa de Verdadeiros Negativos $\frac{\mathrm{VN}}{\mathrm{VN} + \mathrm{FP}}$
+- $\mathrm{VPP} = \frac{\mathrm{VP}}{\mathrm{VP} + \mathrm{FP}}$
+- $\mathrm{VPN} = \frac{\mathrm{VN}}{\mathrm{VN} + \mathrm{FN}}$
+\small
+
 :::
 ::: {.column width="50%"}
 ```{r}
@@ -1146,10 +1146,9 @@ p_roc
 
 ## Limitações do estudo
 
-- **Amostra:** os dados são da população clínica de Cleveland; a generalização deve ser cautelosa.
 - **Dados ausentes:** a análise de casos completos excluiu seis observações ($2{,}0\%$).
 - **Dicotomização:** a recodificação de `num` elimina informação sobre os níveis originais de gravidade.
-- **Seleção stepwise:** pode produzir estimativas e valores-p otimistas.
+- **Seleção stepwise**.
 - **Variável `ca`:** foi tratada como numérica, assumindo efeito linear no logit por vaso adicional.
 
 ## Considerações finais
