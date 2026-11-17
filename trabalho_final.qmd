@@ -48,7 +48,6 @@ format:
         \pagestyle{fancy}
         \fancyhf{}
         \fancyhead[L]{\small\color{gray} Modelos Lineares Generalizados}
-        \fancyhead[R]{\small\color{gray} Relatório técnico}
         \fancyfoot[C]{\small\color{gray} Página \thepage}
         \renewcommand{\headrulewidth}{0.4pt}
         \renewcommand{\footrulewidth}{0.4pt}
@@ -68,7 +67,7 @@ execute:
 
   {\large\bfseries\color{AzulMarinho} DEPARTAMENTO DE ESTATÍSTICA\par}
   \vspace{0.3cm}
-  {\normalsize\color{gray} Modelos Lineares Generalizados --- Relatório Técnico\par}
+  {\normalsize\color{gray} Modelos Lineares Generalizados \par}
 
   \vspace{0.7cm}
   {\color{AzulMarinho}\rule{\linewidth}{1.5pt}}
@@ -126,7 +125,7 @@ Investigar a associação entre características clínicas e demográficas dos p
 
 - Descrever a distribuição das variáveis e a frequência do desfecho na amostra;
 - Investigar associações exploratórias entre as covariáveis e o diagnóstico;
-- Ajustar modelos binomiais com ligações logit, probit e complementar log-log;
+- Ajustar modelos binomiais com ligações logit, probit, log-log e complementar log-log;
 - Comparar os modelos por critérios de informação e testes da razão de verossimilhanças, quando aplicáveis;
 - Obter uma especificação mais parcimoniosa por seleção baseada no AIC;
 - Interpretar os coeficientes do modelo final por meio de razões de chances e intervalos de confiança;
@@ -177,6 +176,7 @@ Foram consideradas três funções de ligação:
 
 - **Logit:** $g(\pi)=\log\{\pi/(1-\pi)\}$. É a ligação usual da regressão logística; seus coeficientes podem ser exponenciados para obter razões de chances (*odds ratios*);
 - **Probit:** $g(\pi)=\Phi^{-1}(\pi)$, em que $\Phi$ é a função de distribuição acumulada da normal padrão;
+- **log-log:** $g(\pi)=\log[-\log(\pi)]$, uma função de ligação assimétrica que permite modelar relações não simétricas entre as covariáveis e a probabilidade de resposta.
 - **Complementar log-log:** $g(\pi)=\log[-\log(1-\pi)]$, uma ligação assimétrica que pode ser útil quando a relação entre probabilidades não é simétrica.
 
 A escolha entre essas ligações pode ser orientada por medidas de ajuste e critérios de informação, desde que os modelos sejam ajustados à mesma resposta, às mesmas observações e ao mesmo conjunto de covariáveis.
@@ -673,7 +673,58 @@ A Figura 4 mostra que as correlações de Spearman entre as variáveis quantitat
 
 ## Ajuste e comparação das funções de ligação
 
-Como a resposta `doenca` é binária, foram ajustados modelos da família binomial com ligações logit, probit e complementar log-log. Todos utilizam as mesmas covariáveis e observações, de modo que a comparação por AIC e BIC seja feita em bases equivalentes.
+Como a variável resposta `doenca` é binária, foram ajustados modelos da família binomial com quatro funções de ligação: logit, probit, complementar log-log e log-log. Todos os modelos utilizam as mesmas covariáveis e observações, de modo que a comparação por AIC e BIC seja realizada em bases equivalentes.
+
+Além das funções de ligação disponíveis diretamente no `R`, também foi considerada a função log-log. Diferentemente das ligações logit, probit e complementar log-log, a função log-log não possui implementação direta como opção padrão na família binomial do `R`. Por esse motivo, foi necessário definir manualmente suas funções de ligação, inversa e derivada, permitindo seu ajuste por meio da função glm(). A função de ligação log-log apresenta um comportamento assimétrico. Como ilustrado no gráfico, à medida que a variável explicativa aumenta, a probabilidade estimada se aproxima rapidamente de zero. Por outro lado, no sentido oposto, a probabilidade se aproxima de um mais lentamente. Esse comportamento diferencia a ligação log-log das funções de ligação simétricas, como a logit.
+
+```{r}
+#| tbl-cap: "Grafico de ligação log-log"
+
+library(ggplot2)
+
+# Valores para a variável explicativa
+x <- seq(-6, 4, length.out = 500)
+
+# Funcao log-log: pi(x) = exp(-exp(alpha + beta*x))
+alpha <- 0
+beta <- 1
+
+dados_loglog <- data.frame(
+  x = x,
+  probabilidade = exp(-exp(alpha + beta * x))
+)
+
+ggplot(dados_loglog, aes(x = x, y = probabilidade)) +
+  geom_line(
+    linewidth = 1.2,
+    color = paleta_azul[1]
+  ) +
+  geom_hline(
+    yintercept = c(0, 1),
+    linetype = "dotted",
+    color = "gray60"
+  ) +
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, 0.2),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  labs(
+    title = "Função de ligação log-log",
+    x = "Variável explicativa (x)",
+    y = expression(pi(x))
+  ) +
+  theme_light(base_size = 15) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+
+```
+
+Dessa forma, a inclusão da ligação log-log permite avaliar uma especificação alternativa à logit e à complementar log-log, verificando se essa estrutura proporciona melhor ajuste aos dados analisados.
 
 ```{r}
 #| tbl-cap: "Comparação dos modelos binomiais segundo diferentes funções de ligação"
@@ -688,12 +739,49 @@ mod_logit <- glm(
 mod_probit <- update(mod_logit, family = binomial(link = "probit"))
 mod_cloglog <- update(mod_logit, family = binomial(link = "cloglog"))
 
+#funcao log-log
+loglog_link <- structure(
+  list(
+    linkfun = function(mu) {
+      -log(-log(mu))
+    },
+
+    linkinv = function(eta) {
+      eta <- pmax(pmin(eta, 700), -700)
+      exp(-exp(-eta))
+    },
+
+    mu.eta = function(eta) {
+      eta <- pmax(pmin(eta, 700), -700)
+      exp(-eta - exp(-eta))
+    },
+
+    valideta = function(eta) {
+      all(is.finite(eta))
+    },
+
+    name = "log-log"
+  ),
+  class = "link-glm"
+)
+
+# Modelo completo log-log
+mod_loglog <- glm(
+  doenca ~ age + sex + cp + trestbps + chol + fbs + restecg +
+    thalach + exang + oldpeak + slope + ca + thal,
+  family = binomial(link = loglog_link),
+  data = dados
+)
+
 comparacao_ligacoes <- data.frame(
-  Modelo = c("Logit", "Probit", "Complementar log-log"),
-  AIC = c(AIC(mod_logit), AIC(mod_probit), AIC(mod_cloglog)),
-  BIC = c(BIC(mod_logit), BIC(mod_probit), BIC(mod_cloglog)),
+  Modelo = c("Logit", "Probit", "Complementar log-log","log-log"),
+  AIC = c(AIC(mod_logit), AIC(mod_probit), AIC(mod_cloglog),
+          AIC(mod_loglog)),
+  BIC = c(BIC(mod_logit), BIC(mod_probit), BIC(mod_cloglog),
+          BIC(mod_loglog)),
   Deviance_residual = c(
-    deviance(mod_logit), deviance(mod_probit), deviance(mod_cloglog)
+    deviance(mod_logit), deviance(mod_probit), deviance(mod_cloglog),
+    deviance(mod_loglog)
   )
 )
 
@@ -705,6 +793,7 @@ knitr::kable(
   col.names = c("Função de ligação", "AIC", "BIC", "Deviance residual"),
   align = "lrrr"
 )
+
 ```
 
 Conforme a Tabela 6, a função de ligação logit obteve o melhor desempenho em todos os critérios avaliados, registrando a menor deviance residual (191,64), o menor AIC (229,64) e o menor BIC (299,82). A ligação probit apresentou ajuste muito próximo ($\Delta\text{AIC} = 1,26$), enquanto a ligação assimétrica complementar log-log mostrou perda considerável de qualidade de ajuste ($\Delta\text{AIC} = 6,42$). Esses resultados indicam que uma curva de resposta simétrica descreve melhor os dados clínicos analisados, justificando a adoção do modelo logit.
